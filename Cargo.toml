@@ -12,8 +12,8 @@ name-table={git="https://github.com/LiGoldragon/name-table.git",rev="c3237f77c08
 schema-language={git="https://github.com/LiGoldragon/schema-language.git",rev="41a7b257dddbcaebf151a053c6fd43324a2a8e39"}
 kameo={git="https://github.com/LiGoldragon/kameo.git",rev="f491b45d7dcb55e5837eddde3d5d7ca8ceaa9f01",default-features=false,features=["macros"]}
 rkyv={version="0.8",features=["bytecheck"]}
-signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="091bb4be754494568be3897304be17d7c5563b7b"}
-signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git",rev="1bd593f4040307bd4d1db76ee15aa67d00efe1e6"}
+signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="a0f90ee7390a9496c63050487d9d431f3f5df85e"}
+signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git",rev="17d90e2a08cd926b4e4096cb48386542036e25a7"}
 tokio={version="1",features=["macros","rt-multi-thread","net","io-util","fs","sync"]}
 thiserror="2"
 [lints.rust]
