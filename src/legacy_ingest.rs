@@ -5,9 +5,9 @@ use core_schema::{
 };
 use name_table::{Identifier, Name, NameTable};
 use schema_language::{
-    Declaration, MultiTypeReferenceProjection as LegacyMultiProjection, SchemaEngine,
-    SchemaIdentity, SingleTypeReferenceProjection as LegacySingleProjection, TypeDeclaration,
-    TypeReference, ValueReferenceProjection as LegacyValueProjection,
+    Declaration, EnumDeclaration, MultiTypeReferenceProjection as LegacyMultiProjection,
+    SchemaEngine, SchemaIdentity, SingleTypeReferenceProjection as LegacySingleProjection,
+    TypeDeclaration, TypeReference, ValueReferenceProjection as LegacyValueProjection,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -18,6 +18,8 @@ pub enum LegacyIngestError {
     UnsupportedPath,
     #[error("unsupported user-defined generic application")]
     UnsupportedApplication,
+    #[error("unsupported application-form interface root")]
+    UnsupportedInterfaceApplication,
 }
 
 pub struct LegacyMigration {
@@ -36,11 +38,20 @@ impl LegacySchemaIngest {
         let mut ingest = Self {
             names: NameTable::new(),
         };
-        let declarations = source
+        let mut declarations = source
             .namespace()
             .iter()
             .map(|declaration| ingest.migrate_declaration(declaration))
             .collect::<Result<Vec<_>, _>>()?;
+        for root in source.input_and_output() {
+            let enumeration = root
+                .as_enum()
+                .ok_or(LegacyIngestError::UnsupportedInterfaceApplication)?;
+            declarations.push(CoreDeclaration::new(
+                Visibility::Public,
+                ingest.migrate_enumeration(enumeration)?,
+            ));
+        }
         Ok(LegacyMigration {
             schema: CoreSchema::new(declarations),
             names: ingest.names,
@@ -72,26 +83,7 @@ impl LegacySchemaIngest {
                     fields,
                 ))
             }
-            TypeDeclaration::Enum(enumeration) => {
-                let variants = enumeration
-                    .variants
-                    .iter()
-                    .map(|variant| {
-                        Ok(CoreVariant::new(
-                            self.intern(variant.name.as_str()),
-                            variant
-                                .payload
-                                .as_ref()
-                                .map(|payload| self.migrate_reference(payload))
-                                .transpose()?,
-                        ))
-                    })
-                    .collect::<Result<Vec<_>, LegacyIngestError>>()?;
-                CoreType::Enumeration(CoreEnum::new(
-                    self.intern(enumeration.name.as_str()),
-                    variants,
-                ))
-            }
+            TypeDeclaration::Enum(enumeration) => self.migrate_enumeration(enumeration)?,
         };
         let visibility = if declaration.is_private() {
             Visibility::Private
@@ -99,6 +91,30 @@ impl LegacySchemaIngest {
             Visibility::Public
         };
         Ok(CoreDeclaration::new(visibility, value))
+    }
+
+    fn migrate_enumeration(
+        &mut self,
+        enumeration: &EnumDeclaration,
+    ) -> Result<CoreType, LegacyIngestError> {
+        let variants = enumeration
+            .variants
+            .iter()
+            .map(|variant| {
+                Ok(CoreVariant::new(
+                    self.intern(variant.name.as_str()),
+                    variant
+                        .payload
+                        .as_ref()
+                        .map(|payload| self.migrate_reference(payload))
+                        .transpose()?,
+                ))
+            })
+            .collect::<Result<Vec<_>, LegacyIngestError>>()?;
+        Ok(CoreType::Enumeration(CoreEnum::new(
+            self.intern(enumeration.name.as_str()),
+            variants,
+        )))
     }
 
     fn migrate_reference(

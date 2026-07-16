@@ -1,7 +1,4 @@
-use std::{
-    convert::Infallible,
-    path::{Path, PathBuf},
-};
+use std::{convert::Infallible, path::PathBuf};
 
 mod legacy_ingest;
 
@@ -13,8 +10,8 @@ use kameo::{
 use legacy_ingest::LegacySchemaIngest;
 use signal_schema::{Rejection as SchemaRejection, Reply as SchemaReply, Request as SchemaRequest};
 use signal_sema_storage::{
-    ChangeEvent, DocumentKey, DocumentKind, DocumentPayload, NameTableBytes, Reply as SemaReply,
-    Request as SemaRequest, Snapshot, SubscriptionIdentifier,
+    ChangeEvent, DocumentKey, DocumentKind, DocumentPayload, FrameMessage, NameTableBytes,
+    Reply as SemaReply, Request as SemaRequest, Snapshot, SubscriptionIdentifier, Wire,
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -33,22 +30,50 @@ pub enum Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
-async fn sema_exchange(socket: &Path, request: &SemaRequest) -> Result<SemaReply> {
-    let mut stream = UnixStream::connect(socket).await?;
-    let bytes = signal_sema_storage::Wire::encode_request(request)
-        .map_err(|error| Error::Codec(error.to_string()))?;
-    stream.write_u32_le(bytes.len() as u32).await?;
-    stream.write_all(&bytes).await?;
-    let length = stream.read_u32_le().await? as usize;
-    let mut reply = vec![0; length];
-    stream.read_exact(&mut reply).await?;
-    rkyv::from_bytes::<SemaReply, rkyv::rancor::Error>(&reply)
-        .map_err(|error| Error::Codec(error.to_string()))
-}
-
 pub struct SemaPlane {
     socket: PathBuf,
     commits: u64,
+}
+impl SemaPlane {
+    async fn read_frame(&self, stream: &mut UnixStream) -> Result<Vec<u8>> {
+        let length = stream.read_u32().await? as usize;
+        let mut frame = Vec::with_capacity(length + 4);
+        frame.extend_from_slice(&(length as u32).to_be_bytes());
+        frame.resize(length + 4, 0);
+        stream.read_exact(&mut frame[4..]).await?;
+        Ok(frame)
+    }
+
+    async fn exchange(&self, request: &SemaRequest) -> Result<SemaReply> {
+        let mut stream = UnixStream::connect(&self.socket).await?;
+        stream
+            .write_all(
+                &Wire::frame_current_handshake_request()
+                    .map_err(|error| Error::Codec(error.to_string()))?,
+            )
+            .await?;
+        let handshake = Wire::decode_frame(&self.read_frame(&mut stream).await?)
+            .map_err(|error| Error::Codec(error.to_string()))?;
+        if !handshake.is_accepted_handshake() {
+            return Err(Error::Codec("Sema rejected frame protocol".into()));
+        }
+        let payload =
+            Wire::encode_request(request).map_err(|error| Error::Codec(error.to_string()))?;
+        stream
+            .write_all(
+                &Wire::frame_request(payload, self.commits)
+                    .map_err(|error| Error::Codec(error.to_string()))?,
+            )
+            .await?;
+        let FrameMessage::Reply { payload, .. } =
+            Wire::decode_frame(&self.read_frame(&mut stream).await?)
+                .map_err(|error| Error::Codec(error.to_string()))?
+        else {
+            return Err(Error::Codec("Sema returned a non-reply frame".into()));
+        };
+        rkyv::from_bytes::<SemaReply, rkyv::rancor::Error>(&payload)
+            .map_err(|error| Error::Codec(error.to_string()))
+    }
 }
 impl Actor for SemaPlane {
     type Args = Self;
@@ -65,7 +90,7 @@ impl Message<Commit> for SemaPlane {
     type Reply = Result<SemaReply>;
     async fn handle(&mut self, message: Commit, _: &mut Context<Self, Self::Reply>) -> Self::Reply {
         self.commits += 1;
-        sema_exchange(&self.socket, &message.0).await
+        self.exchange(&message.0).await
     }
 }
 
