@@ -1,19 +1,256 @@
-use std::{convert::Infallible,path::{Path,PathBuf}};
+use std::{
+    convert::Infallible,
+    path::{Path, PathBuf},
+};
+
 use golden_bridge::LegacySchemaIngest;
-use kameo::{Actor,actor::{ActorRef,Spawn},message::{Context,Message}};
-use signal_schema::{Reply as SchemaReply,Request as SchemaRequest,Rejection as SchemaRejection};
-use signal_sema_storage::{DocumentKey,DocumentKind,DocumentPayload,NameTableBytes,Reply as SemaReply,Request as SemaRequest};
-use tokio::{io::{AsyncReadExt,AsyncWriteExt},net::UnixStream};
-#[derive(Debug,thiserror::Error)]pub enum Error{#[error("io: {0}")]Io(#[from]std::io::Error),#[error("codec: {0}")]Codec(String),#[error("actor: {0}")]Actor(String)}
-type Result<T>=std::result::Result<T,Error>;
-async fn sema_exchange(socket:&Path,request:&SemaRequest)->Result<SemaReply>{let mut stream=UnixStream::connect(socket).await?;let bytes=signal_sema_storage::Wire::encode_request(request).map_err(|e|Error::Codec(e.to_string()))?;stream.write_u32_le(bytes.len() as u32).await?;stream.write_all(&bytes).await?;let length=stream.read_u32_le().await? as usize;let mut reply=vec![0;length];stream.read_exact(&mut reply).await?;rkyv::from_bytes::<SemaReply,rkyv::rancor::Error>(&reply).map_err(|e|Error::Codec(e.to_string()))}
-pub struct SemaPlane{socket:PathBuf,commits:u64}impl Actor for SemaPlane{type Args=Self;type Error=Infallible;async fn on_start(a:Self::Args,_:ActorRef<Self>)->std::result::Result<Self,Self::Error>{Ok(a)}}
-pub struct Commit(pub SemaRequest);impl Message<Commit> for SemaPlane{type Reply=Result<SemaReply>;async fn handle(&mut self,m:Commit,_:&mut Context<Self,Self::Reply>)->Self::Reply{self.commits+=1;sema_exchange(&self.socket,&m.0).await}}
-pub struct NexusPlane{sema:ActorRef<SemaPlane>,transforms:u64}impl Actor for NexusPlane{type Args=Self;type Error=Infallible;async fn on_start(a:Self::Args,_:ActorRef<Self>)->std::result::Result<Self,Self::Error>{Ok(a)}}
-pub struct Dispatch(pub SchemaRequest);impl Message<Dispatch> for NexusPlane{type Reply=Result<SchemaReply>;async fn handle(&mut self,m:Dispatch,_:&mut Context<Self,Self::Reply>)->Self::Reply{self.transforms+=1;let request=match m.0{
- SchemaRequest::IngestTypeSchema{scope,slot,legacy_text}=>{let migration=tokio::task::spawn_blocking(move||LegacySchemaIngest::migrate_text(&legacy_text)).await.map_err(|e|Error::Actor(e.to_string()))?.map_err(|e|Error::Codec(e.to_string()))?;let names=NameTableBytes(migration.names.to_archive_bytes().map_err(|e|Error::Codec(e.to_string()))?.to_vec());SemaRequest::Store{key:DocumentKey{scope,kind:DocumentKind::TypeSchema,slot},payload:DocumentPayload::TypeSchema{schema:migration.schema,names}}},
- SchemaRequest::StoreDocumentRoot{scope,slot,root}=>{let kind=root.kind;let payload=match kind{DocumentKind::SignalContract=>DocumentPayload::SignalContract(root),DocumentKind::NexusRuntime=>DocumentPayload::NexusRuntime(root),DocumentKind::SemaStorage=>DocumentPayload::SemaStorage(root),_=>return Ok(SchemaReply::Rejected(SchemaRejection::RootKindMismatch))};SemaRequest::Store{key:DocumentKey{scope,kind,slot},payload}},
- SchemaRequest::List{scope,kind}=>SemaRequest::List{scope,kind},SchemaRequest::Fetch{hash}=>SemaRequest::HashFetch{hash},SchemaRequest::Subscribe{scope,kind}=>SemaRequest::Subscribe{scope,kind}};
- let reply=self.sema.ask(Commit(request)).send().await.map_err(|e|Error::Actor(e.to_string()))?;Ok(match reply{SemaReply::Stored(v)=>SchemaReply::Stored(v),SemaReply::Listed(v)=>SchemaReply::Listed(v),SemaReply::Document(v)=>SchemaReply::Fetched(v.map(|d|signal_sema_storage::SlotSummary{key:d.key,version:d.version,hash:d.hash})),SemaReply::Subscribed{..}=>SchemaReply::Subscribed,_=>SchemaReply::Rejected(SchemaRejection::StorageFailed)})}}
-pub struct SignalPlane{nexus:ActorRef<NexusPlane>,admitted:u64}impl Actor for SignalPlane{type Args=Self;type Error=Infallible;async fn on_start(a:Self::Args,_:ActorRef<Self>)->std::result::Result<Self,Self::Error>{Ok(a)}}impl Message<Dispatch> for SignalPlane{type Reply=Result<SchemaReply>;async fn handle(&mut self,m:Dispatch,_:&mut Context<Self,Self::Reply>)->Self::Reply{self.admitted+=1;self.nexus.ask(m).send().await.map_err(|e|Error::Actor(e.to_string()))}}
-#[derive(Clone)]pub struct Runtime{signal:ActorRef<SignalPlane>}impl Runtime{pub fn new(sema_socket:PathBuf)->Self{let sema=SemaPlane::spawn(SemaPlane{socket:sema_socket,commits:0});let nexus=NexusPlane::spawn(NexusPlane{sema,transforms:0});Self{signal:SignalPlane::spawn(SignalPlane{nexus,admitted:0})}}pub async fn request(&self,r:SchemaRequest)->Result<SchemaReply>{self.signal.ask(Dispatch(r)).send().await.map_err(|e|Error::Actor(e.to_string()))}}
+use kameo::{
+    Actor,
+    actor::{ActorRef, Spawn},
+    message::{Context, Message},
+};
+use signal_schema::{Rejection as SchemaRejection, Reply as SchemaReply, Request as SchemaRequest};
+use signal_sema_storage::{
+    ChangeEvent, DocumentKey, DocumentKind, DocumentPayload, NameTableBytes, Reply as SemaReply,
+    Request as SemaRequest, Snapshot, SubscriptionIdentifier,
+};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::UnixStream,
+    sync::broadcast,
+};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("codec: {0}")]
+    Codec(String),
+    #[error("actor: {0}")]
+    Actor(String),
+}
+type Result<T> = std::result::Result<T, Error>;
+
+async fn sema_exchange(socket: &Path, request: &SemaRequest) -> Result<SemaReply> {
+    let mut stream = UnixStream::connect(socket).await?;
+    let bytes = signal_sema_storage::Wire::encode_request(request)
+        .map_err(|error| Error::Codec(error.to_string()))?;
+    stream.write_u32_le(bytes.len() as u32).await?;
+    stream.write_all(&bytes).await?;
+    let length = stream.read_u32_le().await? as usize;
+    let mut reply = vec![0; length];
+    stream.read_exact(&mut reply).await?;
+    rkyv::from_bytes::<SemaReply, rkyv::rancor::Error>(&reply)
+        .map_err(|error| Error::Codec(error.to_string()))
+}
+
+pub struct SemaPlane {
+    socket: PathBuf,
+    commits: u64,
+}
+impl Actor for SemaPlane {
+    type Args = Self;
+    type Error = Infallible;
+    async fn on_start(
+        actor: Self::Args,
+        _: ActorRef<Self>,
+    ) -> std::result::Result<Self, Self::Error> {
+        Ok(actor)
+    }
+}
+pub struct Commit(pub SemaRequest);
+impl Message<Commit> for SemaPlane {
+    type Reply = Result<SemaReply>;
+    async fn handle(&mut self, message: Commit, _: &mut Context<Self, Self::Reply>) -> Self::Reply {
+        self.commits += 1;
+        sema_exchange(&self.socket, &message.0).await
+    }
+}
+
+pub struct NexusPlane {
+    sema: ActorRef<SemaPlane>,
+    events: broadcast::Sender<ChangeEvent>,
+    transforms: u64,
+}
+impl Actor for NexusPlane {
+    type Args = Self;
+    type Error = Infallible;
+    async fn on_start(
+        actor: Self::Args,
+        _: ActorRef<Self>,
+    ) -> std::result::Result<Self, Self::Error> {
+        Ok(actor)
+    }
+}
+pub struct Dispatch(pub SchemaRequest);
+impl Message<Dispatch> for NexusPlane {
+    type Reply = Result<SchemaReply>;
+    async fn handle(
+        &mut self,
+        message: Dispatch,
+        _: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        self.transforms += 1;
+        let request = match message.0 {
+            SchemaRequest::IngestTypeSchema {
+                scope,
+                slot,
+                legacy_text,
+            } => {
+                let migration = tokio::task::spawn_blocking(move || {
+                    LegacySchemaIngest::migrate_text(&legacy_text)
+                })
+                .await
+                .map_err(|error| Error::Actor(error.to_string()))?
+                .map_err(|error| Error::Codec(error.to_string()))?;
+                if !migration.excluded.is_empty() {
+                    return Ok(SchemaReply::Rejected(SchemaRejection::InvalidTypeSchema));
+                }
+                let names = NameTableBytes(
+                    migration
+                        .names
+                        .to_archive_bytes()
+                        .map_err(|error| Error::Codec(error.to_string()))?
+                        .to_vec(),
+                );
+                SemaRequest::Store {
+                    key: DocumentKey {
+                        scope,
+                        kind: DocumentKind::TypeSchema,
+                        slot,
+                    },
+                    payload: DocumentPayload::TypeSchema {
+                        schema: migration.schema,
+                        names,
+                    },
+                }
+            }
+            SchemaRequest::StoreSignalContract { scope, slot, root } => SemaRequest::Store {
+                key: DocumentKey {
+                    scope,
+                    kind: DocumentKind::SignalContract,
+                    slot,
+                },
+                payload: DocumentPayload::SignalContract(root),
+            },
+            SchemaRequest::StoreNexusRuntime { scope, slot, root } => SemaRequest::Store {
+                key: DocumentKey {
+                    scope,
+                    kind: DocumentKind::NexusRuntime,
+                    slot,
+                },
+                payload: DocumentPayload::NexusRuntime(root),
+            },
+            SchemaRequest::StoreSemaStorage { scope, slot, root } => SemaRequest::Store {
+                key: DocumentKey {
+                    scope,
+                    kind: DocumentKind::SemaStorage,
+                    slot,
+                },
+                payload: DocumentPayload::SemaStorage(root),
+            },
+            SchemaRequest::List { scope, kind } => SemaRequest::List { scope, kind },
+            SchemaRequest::Fetch { hash } => SemaRequest::HashFetch { hash },
+            SchemaRequest::Subscribe { scope, kind } => SemaRequest::Subscribe { scope, kind },
+        };
+        let reply = self
+            .sema
+            .ask(Commit(request))
+            .send()
+            .await
+            .map_err(|error| Error::Actor(error.to_string()))?;
+        Ok(match reply {
+            SemaReply::Stored(summary) => {
+                let _ = self.events.send(ChangeEvent {
+                    subscription: SubscriptionIdentifier(0),
+                    snapshot: Snapshot(summary.version.0),
+                    document: summary.clone(),
+                });
+                SchemaReply::Stored(summary)
+            }
+            SemaReply::Listed(values) => SchemaReply::Listed(values),
+            SemaReply::Document(value) => {
+                SchemaReply::Fetched(value.map(|document| signal_sema_storage::SlotSummary {
+                    key: document.key,
+                    version: document.version,
+                    hash: document.hash,
+                }))
+            }
+            SemaReply::Subscribed {
+                identifier,
+                initial,
+            } => SchemaReply::Subscribed {
+                identifier,
+                initial,
+            },
+            SemaReply::Rejected(signal_sema_storage::Rejection::InvalidDocument(_)) => {
+                SchemaReply::Rejected(SchemaRejection::InvalidRoot)
+            }
+            _ => SchemaReply::Rejected(SchemaRejection::StorageFailed),
+        })
+    }
+}
+
+pub struct SignalPlane {
+    nexus: ActorRef<NexusPlane>,
+    admitted: u64,
+}
+impl Actor for SignalPlane {
+    type Args = Self;
+    type Error = Infallible;
+    async fn on_start(
+        actor: Self::Args,
+        _: ActorRef<Self>,
+    ) -> std::result::Result<Self, Self::Error> {
+        Ok(actor)
+    }
+}
+impl Message<Dispatch> for SignalPlane {
+    type Reply = Result<SchemaReply>;
+    async fn handle(
+        &mut self,
+        message: Dispatch,
+        _: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        self.admitted += 1;
+        self.nexus
+            .ask(message)
+            .send()
+            .await
+            .map_err(|error| Error::Actor(error.to_string()))
+    }
+}
+
+#[derive(Clone)]
+pub struct Runtime {
+    signal: ActorRef<SignalPlane>,
+    events: broadcast::Sender<ChangeEvent>,
+}
+impl Runtime {
+    pub fn new(sema_socket: PathBuf) -> Self {
+        let sema = SemaPlane::spawn(SemaPlane {
+            socket: sema_socket,
+            commits: 0,
+        });
+        let (events, _) = broadcast::channel(64);
+        let nexus = NexusPlane::spawn(NexusPlane {
+            sema,
+            events: events.clone(),
+            transforms: 0,
+        });
+        Self {
+            signal: SignalPlane::spawn(SignalPlane { nexus, admitted: 0 }),
+            events,
+        }
+    }
+    pub async fn request(&self, request: SchemaRequest) -> Result<SchemaReply> {
+        self.signal
+            .ask(Dispatch(request))
+            .send()
+            .await
+            .map_err(|error| Error::Actor(error.to_string()))
+    }
+    pub fn subscribe(&self) -> broadcast::Receiver<ChangeEvent> {
+        self.events.subscribe()
+    }
+}
