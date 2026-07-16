@@ -1,0 +1,18 @@
+[package]
+name="schema-engine"
+version="0.1.0"
+edition="2024"
+rust-version="1.89"
+license="MIT OR Apache-2.0"
+repository="https://github.com/LiGoldragon/schema-engine"
+description="Core-first Schema daemon and thin CLI"
+[dependencies]
+golden-bridge={git="https://github.com/LiGoldragon/golden-bridge.git",rev="03929a478dec18b597ba8994aaea9e576b41a717"}
+kameo={git="https://github.com/LiGoldragon/kameo.git",rev="f491b45d7dcb55e5837eddde3d5d7ca8ceaa9f01",default-features=false,features=["macros"]}
+rkyv={version="0.8",features=["bytecheck"]}
+signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="445a1d421a1bfba5bd15acd0d8e2c687f640ad7a"}
+signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git",rev="a86cb480ff9505b0c068fc0152de352be99d0ef2"}
+tokio={version="1",features=["macros","rt-multi-thread","net","io-util","fs"]}
+thiserror="2"
+[lints.rust]
+unsafe_code="forbid"
