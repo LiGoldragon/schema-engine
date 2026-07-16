@@ -3,12 +3,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use golden_bridge::LegacySchemaIngest;
+mod legacy_ingest;
+
 use kameo::{
     Actor,
     actor::{ActorRef, Spawn},
     message::{Context, Message},
 };
+use legacy_ingest::LegacySchemaIngest;
 use signal_schema::{Rejection as SchemaRejection, Reply as SchemaReply, Request as SchemaRequest};
 use signal_sema_storage::{
     ChangeEvent, DocumentKey, DocumentKind, DocumentPayload, NameTableBytes, Reply as SemaReply,
@@ -103,9 +105,6 @@ impl Message<Dispatch> for NexusPlane {
                 .await
                 .map_err(|error| Error::Actor(error.to_string()))?
                 .map_err(|error| Error::Codec(error.to_string()))?;
-                if !migration.excluded.is_empty() {
-                    return Ok(SchemaReply::Rejected(SchemaRejection::InvalidTypeSchema));
-                }
                 let names = NameTableBytes(
                     migration
                         .names

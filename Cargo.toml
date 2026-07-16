@@ -7,7 +7,9 @@ license="MIT OR Apache-2.0"
 repository="https://github.com/LiGoldragon/schema-engine"
 description="Core-first Schema daemon and thin CLI"
 [dependencies]
-golden-bridge={git="https://github.com/LiGoldragon/golden-bridge.git",rev="97e53ec31984430f2a267757562f829c94d3c873"}
+core-schema={git="https://github.com/LiGoldragon/core-schema.git",rev="566544eda56a52fb1b5185d8c634dd9a9f2a47e0"}
+name-table={git="https://github.com/LiGoldragon/name-table.git",rev="c3237f77c087e6feab49d6cf34971cebc14a11e6"}
+schema-language={git="https://github.com/LiGoldragon/schema-language.git",rev="41a7b257dddbcaebf151a053c6fd43324a2a8e39"}
 kameo={git="https://github.com/LiGoldragon/kameo.git",rev="f491b45d7dcb55e5837eddde3d5d7ca8ceaa9f01",default-features=false,features=["macros"]}
 rkyv={version="0.8",features=["bytecheck"]}
 signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="fcc929bdf3f348376e66eb8a58a0b0d1a3ca57dd"}

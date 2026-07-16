@@ -241,17 +241,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "golden-bridge"
-version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/golden-bridge.git?rev=97e53ec31984430f2a267757562f829c94d3c873#97e53ec31984430f2a267757562f829c94d3c873"
-dependencies = [
- "core-schema",
- "name-table",
- "schema-language",
- "thiserror",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -497,9 +486,11 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 name = "schema-engine"
 version = "0.1.0"
 dependencies = [
- "golden-bridge",
+ "core-schema",
  "kameo",
+ "name-table",
  "rkyv",
+ "schema-language",
  "signal-schema",
  "signal-sema-storage",
  "thiserror",
