@@ -2,7 +2,7 @@ use std::{env, path::PathBuf};
 
 use schema_engine::Runtime;
 use signal_schema::{Reply, Request, encode_reply, encode_request};
-use signal_sema_storage::{DocumentKind, FixtureScope, SlotIdentifier};
+use signal_sema_storage::{DocumentKind, FixtureScope, FrameMessage, SlotIdentifier, Wire};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{UnixListener, UnixStream},
@@ -27,8 +27,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::fs::create_dir_all(parent)?;
             }
             let _ = std::fs::remove_file(&socket);
-            let listener = UnixListener::bind(socket)?;
+            let listener = UnixListener::bind(&socket)?;
             let runtime = Runtime::new(sema);
+            println!("READY {}", socket.display());
             loop {
                 let (stream, _) = listener.accept().await?;
                 let runtime = runtime.clone();
@@ -61,20 +62,97 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-async fn serve(mut stream: UnixStream, runtime: Runtime) -> Result<(), Box<dyn std::error::Error>> {
-    let request = read_request(&mut stream).await?;
+struct FramedSocket {
+    stream: UnixStream,
+    sequence: u64,
+}
+impl FramedSocket {
+    async fn connect(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut socket = Self {
+            stream: UnixStream::connect(path).await?,
+            sequence: 0,
+        };
+        socket
+            .stream
+            .write_all(&Wire::frame_current_handshake_request()?)
+            .await?;
+        if !Wire::decode_frame(&socket.read_frame().await?)?.is_accepted_handshake() {
+            return Err("daemon rejected shared frame protocol".into());
+        }
+        Ok(socket)
+    }
+    async fn accept(stream: UnixStream) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut socket = Self {
+            stream,
+            sequence: 0,
+        };
+        let FrameMessage::HandshakeRequest(peer) = Wire::decode_frame(&socket.read_frame().await?)?
+        else {
+            return Err("first frame was not a protocol handshake".into());
+        };
+        socket
+            .stream
+            .write_all(&Wire::frame_handshake_reply(Wire::handshake_reply(peer))?)
+            .await?;
+        Ok(socket)
+    }
+    async fn read_frame(&mut self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let length = self.stream.read_u32().await? as usize;
+        let mut frame = Vec::with_capacity(length + 4);
+        frame.extend_from_slice(&(length as u32).to_be_bytes());
+        frame.resize(length + 4, 0);
+        self.stream.read_exact(&mut frame[4..]).await?;
+        Ok(frame)
+    }
+    async fn request(&mut self, request: &Request) -> Result<(), Box<dyn std::error::Error>> {
+        let payload = encode_request(request).map_err(|error| format!("encode: {error}"))?;
+        let frame = Wire::frame_request(payload, self.sequence)?;
+        self.sequence += 1;
+        self.stream.write_all(&frame).await?;
+        Ok(())
+    }
+    async fn reply(&mut self) -> Result<Reply, Box<dyn std::error::Error>> {
+        let FrameMessage::Reply { payload, .. } = Wire::decode_frame(&self.read_frame().await?)?
+        else {
+            return Err("expected shared reply frame".into());
+        };
+        Ok(rkyv::from_bytes::<Reply, rkyv::rancor::Error>(&payload)?)
+    }
+}
+
+async fn serve(stream: UnixStream, runtime: Runtime) -> Result<(), Box<dyn std::error::Error>> {
+    let mut socket = FramedSocket::accept(stream).await?;
+    let FrameMessage::Request { exchange, payload } =
+        Wire::decode_frame(&socket.read_frame().await?)?
+    else {
+        return Err("expected shared request frame".into());
+    };
+    let request = rkyv::from_bytes::<Request, rkyv::rancor::Error>(&payload)?;
     let subscription_filter = match &request {
         Request::Subscribe { scope, kind } => Some((*scope, *kind)),
         _ => None,
     };
     let mut events = runtime.subscribe();
-    write_reply(&mut stream, &runtime.request(request).await?).await?;
+    let reply = runtime.request(request).await?;
+    socket
+        .stream
+        .write_all(&Wire::frame_reply(
+            exchange,
+            encode_reply(&reply).map_err(|error| error.to_string())?,
+        )?)
+        .await?;
     if let Some((scope, kind)) = subscription_filter {
         while let Ok(event) = events.recv().await {
             if event.document.key.scope == scope
                 && kind.is_none_or(|expected| event.document.key.kind == expected)
             {
-                write_reply(&mut stream, &Reply::Event(event)).await?;
+                socket
+                    .stream
+                    .write_all(&Wire::frame_reply(
+                        exchange,
+                        encode_reply(&Reply::Event(event)).map_err(|error| error.to_string())?,
+                    )?)
+                    .await?;
             }
         }
     }
@@ -82,53 +160,20 @@ async fn serve(mut stream: UnixStream, runtime: Runtime) -> Result<(), Box<dyn s
 }
 
 async fn subscribe(socket: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let mut stream = UnixStream::connect(socket).await?;
-    write_request(
-        &mut stream,
-        &Request::Subscribe {
+    let mut socket = FramedSocket::connect(socket).await?;
+    socket
+        .request(&Request::Subscribe {
             scope: FixtureScope(1),
             kind: Some(DocumentKind::TypeSchema),
-        },
-    )
-    .await?;
+        })
+        .await?;
     loop {
-        println!("{:?}", read_reply(&mut stream).await?);
+        println!("{:?}", socket.reply().await?);
     }
 }
 
 async fn client(socket: &PathBuf, request: &Request) -> Result<Reply, Box<dyn std::error::Error>> {
-    let mut stream = UnixStream::connect(socket).await?;
-    write_request(&mut stream, request).await?;
-    read_reply(&mut stream).await
-}
-
-async fn read_request(stream: &mut UnixStream) -> Result<Request, Box<dyn std::error::Error>> {
-    let length = stream.read_u32_le().await? as usize;
-    let mut bytes = vec![0; length];
-    stream.read_exact(&mut bytes).await?;
-    Ok(rkyv::from_bytes::<Request, rkyv::rancor::Error>(&bytes)?)
-}
-async fn write_request(
-    stream: &mut UnixStream,
-    request: &Request,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let bytes = encode_request(request).map_err(|error| format!("encode: {error}"))?;
-    stream.write_u32_le(bytes.len() as u32).await?;
-    stream.write_all(&bytes).await?;
-    Ok(())
-}
-async fn read_reply(stream: &mut UnixStream) -> Result<Reply, Box<dyn std::error::Error>> {
-    let length = stream.read_u32_le().await? as usize;
-    let mut bytes = vec![0; length];
-    stream.read_exact(&mut bytes).await?;
-    Ok(rkyv::from_bytes::<Reply, rkyv::rancor::Error>(&bytes)?)
-}
-async fn write_reply(
-    stream: &mut UnixStream,
-    reply: &Reply,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let bytes = encode_reply(reply).map_err(|error| format!("encode: {error}"))?;
-    stream.write_u32_le(bytes.len() as u32).await?;
-    stream.write_all(&bytes).await?;
-    Ok(())
+    let mut socket = FramedSocket::connect(socket).await?;
+    socket.request(request).await?;
+    socket.reply().await
 }
