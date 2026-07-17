@@ -18,7 +18,7 @@ signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git
 tokio={version="1",features=["macros","rt-multi-thread","net","io-util","fs","sync"]}
 thiserror="2"
 [dev-dependencies]
-sema-storage={git="https://github.com/LiGoldragon/sema-storage.git",rev="a088dc14bcc6b94ab1b0c3e41e2250ddf1e7b06f"}
+sema-storage={git="https://github.com/LiGoldragon/sema-storage.git",rev="3b71a90e6d841dfd57e5d6c7cee235d1f7cd27c8"}
 tempfile="3"
 [lints.rust]
 unsafe_code="forbid"
