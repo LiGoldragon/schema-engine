@@ -16,7 +16,9 @@
         pkgs = import nixpkgs { inherit system; };
         rust = rust-build.lib.${system}.fromPkgs pkgs;
         inherit (rust) craneLib toolchain;
-        src = rust.cleanSource { root = ./.; };
+        # The equivalence witness reads a .schema fixture; preserve non-Rust test data
+        # (rust.cleanSource strips it), mirroring language-engine-witness.
+        src = pkgs.lib.cleanSource ./.;
         commonArguments = { inherit src; strictDeps = true; };
         cargoArtifacts = craneLib.buildDepsOnly commonArguments;
       in

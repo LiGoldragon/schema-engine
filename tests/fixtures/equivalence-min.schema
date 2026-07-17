@@ -1,0 +1,12 @@
+{}
+[Submit.Task Cancel.Handle]
+[Accepted.Receipt Rejected.Reason]
+{
+  Handle.Integer
+  Priority.[Low Normal High]
+  Task.{ Handle Priority }
+  Receipt.Integer
+  Reason.[Unknown Busy]
+}
+{}
+{}

@@ -1,6 +1,9 @@
 use std::{convert::Infallible, path::PathBuf};
 
+pub mod authority_ingest;
 mod legacy_ingest;
+
+pub use authority_ingest::{AuthorityIngestError, ParsedSchema};
 
 use kameo::{
     Actor,
@@ -119,6 +122,15 @@ impl Message<Dispatch> for NexusPlane {
     ) -> Self::Reply {
         self.transforms += 1;
         let request = match message.0 {
+            // LEAN `offline-self-contained-ingest`: the `IngestTypeSchema` path migrates
+            // legacy text and stores the resulting schema DIRECTLY with its own
+            // parse-order name table — it never consults the central identity authority,
+            // so its identifiers are parse-order interned rather than authority-assigned.
+            // This is the offline mode; the authority-bound online path
+            // ([`authority_ingest::ParsedSchema`]) realizes the keystone. Revision
+            // trigger: wiring the daemon's default ingestion through the authority (a
+            // BindIdentities round-trip before Store), once the projection consumers read
+            // authority-assigned universes.
             SchemaRequest::IngestTypeSchema {
                 scope,
                 slot,

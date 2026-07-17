@@ -15,6 +15,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 
 [[package]]
+name = "bitflags"
+version = "2.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
+
+[[package]]
 name = "blake3"
 version = "1.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -109,7 +115,7 @@ dependencies = [
 [[package]]
 name = "core-schema"
 version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/core-schema.git?rev=72d1c98596f2bba96a80d8c75b16780c4a0dfefe#72d1c98596f2bba96a80d8c75b16780c4a0dfefe"
+source = "git+https://github.com/LiGoldragon/core-schema.git?rev=b08351167283257a4b2a4d52048d77b42e3a79c7#b08351167283257a4b2a4d52048d77b42e3a79c7"
 dependencies = [
  "content-identity",
  "name-table",
@@ -145,6 +151,22 @@ name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
+
+[[package]]
+name = "errno"
+version = "0.3.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
+dependencies = [
+ "libc",
+ "windows-sys",
+]
+
+[[package]]
+name = "fastrand"
+version = "2.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 
 [[package]]
 name = "find-msvc-tools"
@@ -241,6 +263,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "getrandom"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "r-efi",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -302,6 +335,12 @@ name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
+
+[[package]]
+name = "linux-raw-sys"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "memchr"
@@ -426,6 +465,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "r-efi"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
+
+[[package]]
 name = "rancor"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -441,6 +486,15 @@ source = "git+https://github.com/LiGoldragon/raw-discovery.git?rev=a4e8c6df84e6a
 dependencies = [
  "rkyv",
  "thiserror",
+]
+
+[[package]]
+name = "redb"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e925444704b5f17d32bf42f5b6e2df050bceebc3dcd6e71cc73dafe8092e839"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -483,6 +537,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustix"
+version = "1.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190"
+dependencies = [
+ "bitflags",
+ "errno",
+ "libc",
+ "linux-raw-sys",
+ "windows-sys",
+]
+
+[[package]]
 name = "rustversion"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -492,13 +559,16 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 name = "schema-engine"
 version = "0.1.0"
 dependencies = [
+ "content-identity",
  "core-schema",
  "kameo",
  "name-table",
  "rkyv",
  "schema-language",
+ "sema-storage",
  "signal-schema",
  "signal-sema-storage",
+ "tempfile",
  "thiserror",
  "tokio",
 ]
@@ -512,6 +582,44 @@ dependencies = [
  "nota",
  "rkyv",
  "thiserror",
+]
+
+[[package]]
+name = "sema"
+version = "0.1.1"
+source = "git+https://github.com/LiGoldragon/sema.git?rev=51d7927c872f0df12791bad8d39a4db6433b01a1#51d7927c872f0df12791bad8d39a4db6433b01a1"
+dependencies = [
+ "redb",
+ "rkyv",
+ "thiserror",
+]
+
+[[package]]
+name = "sema-engine"
+version = "0.10.1"
+source = "git+https://github.com/LiGoldragon/sema-engine.git?rev=93a6b5f063292e000a7bf395fdd5b46e3e943068#93a6b5f063292e000a7bf395fdd5b46e3e943068"
+dependencies = [
+ "blake3",
+ "rkyv",
+ "sema",
+ "signal-frame",
+ "signal-sema",
+ "thiserror",
+]
+
+[[package]]
+name = "sema-storage"
+version = "0.1.0"
+source = "git+https://github.com/LiGoldragon/sema-storage.git?rev=b61f25269872b2c883d8fbf034ca5087cf6c0ce9#b61f25269872b2c883d8fbf034ca5087cf6c0ce9"
+dependencies = [
+ "kameo",
+ "name-table",
+ "rkyv",
+ "sema-engine",
+ "signal-frame",
+ "signal-sema-storage",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -574,7 +682,7 @@ dependencies = [
 [[package]]
 name = "signal-schema"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/signal-schema.git?rev=7e9602c7b0ff2cffc58aff5a9997a5a6dc8c5a04#7e9602c7b0ff2cffc58aff5a9997a5a6dc8c5a04"
+source = "git+https://github.com/LiGoldragon/signal-schema.git?rev=68cea52df66adbd424cae8a22f2882c24d44a861#68cea52df66adbd424cae8a22f2882c24d44a861"
 dependencies = [
  "rkyv",
  "signal-sema-storage",
@@ -582,9 +690,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "signal-sema"
+version = "0.2.0"
+source = "git+https://github.com/LiGoldragon/signal-sema.git?rev=4f3a24e6677ab9d200672851016c4c760c1e36e8#4f3a24e6677ab9d200672851016c4c760c1e36e8"
+dependencies = [
+ "rkyv",
+ "thiserror",
+]
+
+[[package]]
 name = "signal-sema-storage"
 version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/signal-sema-storage.git?rev=fe925a0afeb0b5da1dad06bef06e3db4b46bac38#fe925a0afeb0b5da1dad06bef06e3db4b46bac38"
+source = "git+https://github.com/LiGoldragon/signal-sema-storage.git?rev=69ce70f415f6320eefa691acf14c57f6752dff02#69ce70f415f6320eefa691acf14c57f6752dff02"
 dependencies = [
  "content-identity",
  "core-logos",
@@ -638,6 +755,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "tempfile"
+version = "3.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
+dependencies = [
+ "fastrand",
+ "getrandom",
+ "once_cell",
+ "rustix",
+ "windows-sys",
 ]
 
 [[package]]
