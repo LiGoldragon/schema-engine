@@ -576,7 +576,7 @@ dependencies = [
 [[package]]
 name = "schema-language"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/schema-language.git?rev=4270fbdad5318518291829c2f08b22090e833182#4270fbdad5318518291829c2f08b22090e833182"
+source = "git+https://github.com/LiGoldragon/schema-language.git?rev=eccc226210a4#eccc226210a4c3d7e0bd003a70c88f3e83d1b9e6"
 dependencies = [
  "blake3",
  "nota",
