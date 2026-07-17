@@ -109,7 +109,7 @@ dependencies = [
 [[package]]
 name = "core-schema"
 version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/core-schema.git?rev=566544eda56a52fb1b5185d8c634dd9a9f2a47e0#566544eda56a52fb1b5185d8c634dd9a9f2a47e0"
+source = "git+https://github.com/LiGoldragon/core-schema.git?rev=337eb38d7cbcf31cf2fc445753bbebd2c739dbc3#337eb38d7cbcf31cf2fc445753bbebd2c739dbc3"
 dependencies = [
  "content-identity",
  "name-table",
@@ -574,7 +574,7 @@ dependencies = [
 [[package]]
 name = "signal-schema"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/signal-schema.git?rev=1b090702e5c2f792a64e2cf1c51a5698505d9bad#1b090702e5c2f792a64e2cf1c51a5698505d9bad"
+source = "git+https://github.com/LiGoldragon/signal-schema.git?rev=f720a520a13ff1df3fe567c86ccf8296ed4b88fa#f720a520a13ff1df3fe567c86ccf8296ed4b88fa"
 dependencies = [
  "rkyv",
  "signal-sema-storage",
@@ -584,7 +584,7 @@ dependencies = [
 [[package]]
 name = "signal-sema-storage"
 version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/signal-sema-storage.git?rev=bd6cd6c4f2f020ad04427fc8ca86ca22d9cf4e6c#bd6cd6c4f2f020ad04427fc8ca86ca22d9cf4e6c"
+source = "git+https://github.com/LiGoldragon/signal-sema-storage.git?rev=4c2d6eff955d3c855eaef0175aa7cbd56fee7803#4c2d6eff955d3c855eaef0175aa7cbd56fee7803"
 dependencies = [
  "content-identity",
  "core-logos",
@@ -677,9 +677,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.52.4"
+version = "1.53.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "317fafbbe3f02fc663dad00ea6186197de963cd4190e86a26d8d0fae095539af"
+checksum = "d988bcd52dbe076d3d46903332f58c912b87a2c49b1428419a5845154762ffee"
 dependencies = [
  "bytes",
  "libc",
@@ -692,9 +692,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "2.7.0"
+version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "385a6cb71ab9ab790c5fe8d67f1645e6c450a7ce006a33de03daa956cf70a496"
+checksum = "6328af13490e73a9b4694030fafd93f8c8c6a9dede33e821c3fc63eddf8042ba"
 dependencies = [
  "proc-macro2",
  "quote",
