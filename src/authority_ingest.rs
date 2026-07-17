@@ -24,9 +24,11 @@
 //! Resolving through the front end's name table — never folding raw `Identifier` integers
 //! — is what makes both the key and the shape a function of the DECLARED content, so the
 //! two front ends agree on them for one source. Revision trigger: an authoring surface
-//! carrying an explicit per-declaration bind/mint marker distinct from the name, or an
-//! elided-string-field spelling ruling (bead .31) that changes what a resolved field name
-//! canonicalises to.
+//! carrying an explicit per-declaration bind/mint marker distinct from the name.
+//! (The elided-string-field spelling ruling of bead .31 has since landed — the derived
+//! name canonicalises to `string` on both front ends — and this LEAN held unchanged,
+//! because it already resolves field names through each front end's name table rather
+//! than folding raw identifiers.)
 
 use content_identity::IdentityHasher;
 use core_schema::declaration::{CoreDeclaration, CoreField, CoreVariant};

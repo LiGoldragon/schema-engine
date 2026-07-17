@@ -17,19 +17,16 @@
 //! in-process rather than over a socket. The socket-live four-process pipeline is
 //! witnessed separately in `language-engine-witness`.
 //!
-//! WATCH (bead .31, psyche-pending): the witness runs on a purpose-authored fixture
-//! rather than `spirit-min` because `spirit-min` triggers two front-end representation
-//! divergences that make exact parity IMPOSSIBLE until the psyche rules — proven by
-//! ingesting `spirit-min` through both front ends. First, `.31` proper — a direct
-//! string scalar (`Topic.String`, `Description.String`): the legacy front end
-//! (`schema-language`) recognises `String` as the string scalar leaf, while the native
-//! decode (`core-schema`) recognises only `Text`, so it reads `String` as a `Plain`
-//! reference to a user type. Native `Text` vs legacy `String`; not reconciled here (the
-//! spelling is the psyche's to rule). Second, a single-field braced type
-//! (`Summary.{ Description }`): the legacy front end lowers it to a newtype, the native
-//! decode keeps a single-field struct. Every other `spirit-min` declaration —
-//! multi-field structs, Plain cross-references, enums, and both interface roots —
-//! already agrees across the two front ends.
+//! RESOLVED (beads .31, .36; psyche rulings 2026-07-17): the witness now runs on
+//! `spirit-min` ITSELF ([`spirit_min_ingests_to_identical_core_identity`]), the real
+//! fixture through both front ends, hash-equal. The two former divergences are closed
+//! by the native front end converging onto the rulings: (1) the string scalar's
+//! canonical spelling is `String` ("Strings are Strings"), so `Topic.String` /
+//! `Description.String` recognise the same string leaf on both sides; (2) a single-field
+//! braced type `Summary.{ Description }` lowers to a NEWTYPE on both sides (newtype
+//! ruling). The purpose-authored fixture test
+//! ([`legacy_and_native_ingest_to_identical_core_identity`]) is KEPT: it guards the
+//! canonicalisation independently of the specific `spirit-min` shape.
 
 use schema_engine::ParsedSchema;
 use sema_storage::Runtime;
@@ -66,8 +63,19 @@ async fn bind(
     bound
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn legacy_and_native_ingest_to_identical_core_identity() {
+/// The real `spirit-min` schema, verbatim — the same fixture the socket-live
+/// `language-engine-witness` and the frozen `golden-bridge` carry. It exercises BOTH
+/// constructs the two front ends once represented differently: a direct string scalar
+/// (`Topic.String`, `Description.String`) and a single-field braced type
+/// (`Summary.{ Description }`). With the 2026-07-17 rulings both front ends now agree.
+const SPIRIT_MIN: &str = include_str!("fixtures/spirit-min.schema");
+
+/// Ingest one source through BOTH front ends, bind each against the one authority under
+/// the same schema-whole handle, and assert the two built universes carry identical
+/// `CoreSchema` content identity. This is the whole point of the authority-provided
+/// universe path: two front ends that intern into disagreeing private name tables,
+/// re-stamped through one assignment, collapse to byte-identical Core content.
+async fn assert_front_ends_agree(source: &str, whole_key: &[u8]) {
     let temporary = tempfile::tempdir().expect("temp dir");
     let runtime = Runtime::open(&temporary.path().join("authority.sema"))
         .await
@@ -75,10 +83,10 @@ async fn legacy_and_native_ingest_to_identical_core_identity() {
 
     // One schema-whole handle: both front ends present it, so the authority binds the
     // SAME universe and identities to each.
-    let whole = SchemaWholeHandle(b"equivalence:min".to_vec());
+    let whole = SchemaWholeHandle(whole_key.to_vec());
 
-    let legacy = ParsedSchema::from_legacy(EQUIVALENCE_MIN).expect("legacy front end");
-    let native = ParsedSchema::from_native(EQUIVALENCE_MIN).expect("native front end");
+    let legacy = ParsedSchema::from_legacy(source).expect("legacy front end");
+    let native = ParsedSchema::from_native(source).expect("native front end");
 
     let legacy_bound = bind(&runtime, whole.clone(), &legacy).await;
     let native_bound = bind(&runtime, whole.clone(), &native).await;
@@ -106,4 +114,20 @@ async fn legacy_and_native_ingest_to_identical_core_identity() {
     );
 
     runtime.shutdown().await.expect("shutdown authority");
+}
+
+/// The purpose-authored fixture: kept as an independent guard on the canonicalisation,
+/// deliberately avoiding the two once-divergent constructs (see the module note).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn legacy_and_native_ingest_to_identical_core_identity() {
+    assert_front_ends_agree(EQUIVALENCE_MIN, b"equivalence:min").await;
+}
+
+/// The keystone, on the REAL fixture: `spirit-min` ITSELF — with its direct `String`
+/// scalars and its single-field braced `Summary.{ Description }` — ingests through both
+/// front ends to identical `CoreSchema` content identity, now that the native front end
+/// has converged onto the 2026-07-17 rulings.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn spirit_min_ingests_to_identical_core_identity() {
+    assert_front_ends_agree(SPIRIT_MIN, b"equivalence:spirit-min").await;
 }

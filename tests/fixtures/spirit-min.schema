@@ -1,0 +1,17 @@
+{}
+[Record.Entry Observe.Query]
+[RecordAccepted.RecordIdentifier RecordsObserved.RecordSet]
+{
+  Topic.String
+  Topics.Vector.Topic
+  Description.String
+  Summary.{ Description }
+  RecordIdentifier.Integer
+  Entry.{ Topics Kind Description Magnitude }
+  Query.{ Topic Kind }
+  RecordSet.Vector.Entry
+  Kind.[Decision Principle Correction Clarification Constraint]
+  Magnitude.[Minimum VeryLow Low Medium High VeryHigh Maximum]
+}
+{}
+{}
