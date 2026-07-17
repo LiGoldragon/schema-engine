@@ -28,6 +28,7 @@
 //! ([`legacy_and_native_ingest_to_identical_core_identity`]) is KEPT: it guards the
 //! canonicalisation independently of the specific `spirit-min` shape.
 
+use core_schema::{CoreReference, CoreType};
 use schema_engine::ParsedSchema;
 use sema_storage::Runtime;
 use signal_sema_storage::{BoundIdentities, Reply, Request, SchemaWholeHandle};
@@ -130,4 +131,61 @@ async fn legacy_and_native_ingest_to_identical_core_identity() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn spirit_min_ingests_to_identical_core_identity() {
     assert_front_ends_agree(SPIRIT_MIN, b"equivalence:spirit-min").await;
+}
+
+/// Directly witness the shape ruling (beads .36, psyche 2026-07-17) that makes the
+/// equivalence above hold: the single-field braced declaration `Summary.{ Description }`
+/// lowers to a NEWTYPE over `Description` — not a one-field struct. The hash-equal tests
+/// above would still pass if BOTH front ends agreed on a struct; this pins the actual
+/// shape the ruling requires, on the native decode path and on the legacy one.
+fn assert_summary_is_a_newtype_over_description(parsed: &ParsedSchema, front_end: &str) {
+    let names = parsed.names();
+    let summary = parsed
+        .schema()
+        .declarations()
+        .iter()
+        .find(|declaration| {
+            names
+                .resolve(declaration.identifier())
+                .is_ok_and(|name| name.as_str() == "Summary")
+        })
+        .unwrap_or_else(|| panic!("{front_end}: spirit-min declares Summary"));
+
+    let CoreType::Newtype(newtype) = summary.value() else {
+        panic!(
+            "{front_end}: single-field braced Summary.{{ Description }} must lower to a newtype \
+             (beads .36 ruling: a single-field brace is a newtype), found {:?}",
+            summary.value()
+        );
+    };
+
+    let CoreReference::Plain(target) = newtype.reference() else {
+        panic!(
+            "{front_end}: Summary's newtype target must be the declared type Description, found {:?}",
+            newtype.reference()
+        );
+    };
+    assert_eq!(
+        names
+            .resolve(*target)
+            .expect("resolve Summary's newtype target")
+            .as_str(),
+        "Description",
+        "{front_end}: Summary is a newtype over Description",
+    );
+}
+
+/// The missing round-trip witness (review item on beads .36): the NATIVE `core-schema`
+/// six-slot document decode lowers `Summary.{ Description }` from the real `spirit-min`
+/// fixture to a newtype over `Description`. The legacy front end is asserted alongside
+/// so the both-sides ruling is pinned directly, not only inferred from hash equality.
+#[test]
+fn native_decode_lowers_single_field_brace_summary_to_a_newtype() {
+    let native =
+        ParsedSchema::from_native(SPIRIT_MIN).expect("native front end decodes spirit-min");
+    assert_summary_is_a_newtype_over_description(&native, "native");
+
+    let legacy =
+        ParsedSchema::from_legacy(SPIRIT_MIN).expect("legacy front end decodes spirit-min");
+    assert_summary_is_a_newtype_over_description(&legacy, "legacy");
 }
