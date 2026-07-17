@@ -10,7 +10,7 @@ description="Core-first Schema daemon and thin CLI"
 core-schema={git="https://github.com/LiGoldragon/core-schema.git",rev="8507b6562d980a24dd8aada9e23f9ae7ef08920a"}
 content-identity={git="https://github.com/LiGoldragon/content-identity.git",rev="6cc0408cdb96f174cc8fdf6ca23420038de28450"}
 name-table={git="https://github.com/LiGoldragon/name-table.git",rev="c3237f77c087e6feab49d6cf34971cebc14a11e6"}
-schema-language={git="https://github.com/LiGoldragon/schema-language.git",rev="eccc226210a4"}
+schema-language={git="https://github.com/LiGoldragon/schema-language.git",rev="9c217610c4b8"}
 kameo={git="https://github.com/LiGoldragon/kameo.git",rev="f491b45d7dcb55e5837eddde3d5d7ca8ceaa9f01",default-features=false,features=["macros"]}
 rkyv={version="0.8",features=["bytecheck"]}
 signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="a7d62024aad57a761a3e60b397eb475c4858b4f5"}
