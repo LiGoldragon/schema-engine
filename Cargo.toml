@@ -13,12 +13,12 @@ name-table={git="https://github.com/LiGoldragon/name-table.git",rev="c3237f77c08
 schema-language={git="https://github.com/LiGoldragon/schema-language.git",rev="9c217610c4b8"}
 kameo={git="https://github.com/LiGoldragon/kameo.git",rev="f491b45d7dcb55e5837eddde3d5d7ca8ceaa9f01",default-features=false,features=["macros"]}
 rkyv={version="0.8",features=["bytecheck"]}
-signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="8e47cb93df02dc2a6b34eba2266c48eee2ba3452"}
-signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git",rev="1a7d50b99327acf3658fd8647ab91859e8c4be15"}
+signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="6e426b61cf97f6da977dd8a8cd690bf1914f850b"}
+signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git",rev="28aeafb2588ea01908b55b75c431e1aa0c238f6f"}
 tokio={version="1",features=["macros","rt-multi-thread","net","io-util","fs","sync"]}
 thiserror="2"
 [dev-dependencies]
-sema-storage={git="https://github.com/LiGoldragon/sema-storage.git",rev="3b71a90e6d841dfd57e5d6c7cee235d1f7cd27c8"}
+sema-storage={git="https://github.com/LiGoldragon/sema-storage.git",rev="dfe78a25ae263e823cef288d21e06c2b0be76173"}
 tempfile="3"
 [lints.rust]
 unsafe_code="forbid"
