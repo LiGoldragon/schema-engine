@@ -7,18 +7,18 @@ license="MIT OR Apache-2.0"
 repository="https://github.com/LiGoldragon/schema-engine"
 description="Core-first Schema daemon and thin CLI"
 [dependencies]
-core-schema={git="https://github.com/LiGoldragon/core-schema.git",rev="8507b6562d980a24dd8aada9e23f9ae7ef08920a"}
+core-schema={git="https://github.com/LiGoldragon/core-schema.git",rev="d3cdee9ac2c17de16a7745c9854344d8bbcde64e"}
 content-identity={git="https://github.com/LiGoldragon/content-identity.git",rev="6cc0408cdb96f174cc8fdf6ca23420038de28450"}
 name-table={git="https://github.com/LiGoldragon/name-table.git",rev="c3237f77c087e6feab49d6cf34971cebc14a11e6"}
 schema-language={git="https://github.com/LiGoldragon/schema-language.git",rev="9c217610c4b8"}
 kameo={git="https://github.com/LiGoldragon/kameo.git",rev="f491b45d7dcb55e5837eddde3d5d7ca8ceaa9f01",default-features=false,features=["macros"]}
 rkyv={version="0.8",features=["bytecheck"]}
-signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="6e426b61cf97f6da977dd8a8cd690bf1914f850b"}
-signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git",rev="28aeafb2588ea01908b55b75c431e1aa0c238f6f"}
+signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="bc68dc8fa1b16b00156ca36e2690fd77fda91a52"}
+signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git",rev="31ab48608a3c2eab0733dcb16a3351251a70789d"}
 tokio={version="1",features=["macros","rt-multi-thread","net","io-util","fs","sync"]}
 thiserror="2"
 [dev-dependencies]
-sema-storage={git="https://github.com/LiGoldragon/sema-storage.git",rev="dfe78a25ae263e823cef288d21e06c2b0be76173"}
+sema-storage={git="https://github.com/LiGoldragon/sema-storage.git",rev="269953164460cd842c1f3f8c9c93e4afe1e3628e"}
 tempfile="3"
 [lints.rust]
 unsafe_code="forbid"
