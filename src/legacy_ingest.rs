@@ -1,7 +1,8 @@
 use core_schema::{
-    CoreDeclaration, CoreEnum, CoreField, CoreNewtype, CoreReference, CoreSchema, CoreStruct,
-    CoreType, CoreVariant, DeclarationRole, MultiTypeReferenceProjection,
-    SingleTypeReferenceProjection, ValueReferenceProjection, Visibility,
+    DeclarationRole, EncodedDeclaration, EncodedEnum, EncodedField, EncodedNewtype,
+    EncodedReference, EncodedSchema, EncodedStruct, EncodedType, EncodedVariant,
+    MultiTypeReferenceProjection, SingleTypeReferenceProjection, ValueReferenceProjection,
+    Visibility,
 };
 use name_table::{Identifier, Name, NameTable};
 use schema_language::{
@@ -23,7 +24,7 @@ pub enum LegacyIngestError {
 }
 
 pub struct LegacyMigration {
-    pub schema: CoreSchema,
+    pub schema: EncodedSchema,
     pub names: NameTable,
 }
 
@@ -52,7 +53,7 @@ impl LegacySchemaIngest {
         declarations.push(ingest.migrate_interface(&input, DeclarationRole::InterfaceInput)?);
         declarations.push(ingest.migrate_interface(&output, DeclarationRole::InterfaceOutput)?);
         Ok(LegacyMigration {
-            schema: CoreSchema::new(declarations),
+            schema: EncodedSchema::new(declarations),
             names: ingest.names,
         })
     }
@@ -65,11 +66,11 @@ impl LegacySchemaIngest {
         &mut self,
         root: &Root,
         role: DeclarationRole,
-    ) -> Result<CoreDeclaration, LegacyIngestError> {
+    ) -> Result<EncodedDeclaration, LegacyIngestError> {
         let enumeration = root
             .as_enum()
             .ok_or(LegacyIngestError::UnsupportedInterfaceApplication)?;
-        Ok(CoreDeclaration::interface(
+        Ok(EncodedDeclaration::interface(
             role,
             self.migrate_enumeration(enumeration)?,
         ))
@@ -78,9 +79,9 @@ impl LegacySchemaIngest {
     fn migrate_declaration(
         &mut self,
         declaration: &Declaration,
-    ) -> Result<CoreDeclaration, LegacyIngestError> {
+    ) -> Result<EncodedDeclaration, LegacyIngestError> {
         let value = match declaration.value() {
-            TypeDeclaration::Newtype(newtype) => CoreType::Newtype(CoreNewtype::new(
+            TypeDeclaration::Newtype(newtype) => EncodedType::Newtype(EncodedNewtype::new(
                 self.intern(newtype.name.as_str()),
                 self.migrate_reference(&newtype.reference)?,
             )),
@@ -89,13 +90,13 @@ impl LegacySchemaIngest {
                     .fields
                     .iter()
                     .map(|field| {
-                        Ok(CoreField::new(
+                        Ok(EncodedField::new(
                             self.intern(field.name.as_str()),
                             self.migrate_reference(&field.reference)?,
                         ))
                     })
                     .collect::<Result<Vec<_>, LegacyIngestError>>()?;
-                CoreType::Struct(CoreStruct::new(
+                EncodedType::Struct(EncodedStruct::new(
                     self.intern(structure.name.as_str()),
                     fields,
                 ))
@@ -107,18 +108,18 @@ impl LegacySchemaIngest {
         } else {
             Visibility::Public
         };
-        Ok(CoreDeclaration::new(visibility, value))
+        Ok(EncodedDeclaration::new(visibility, value))
     }
 
     fn migrate_enumeration(
         &mut self,
         enumeration: &EnumDeclaration,
-    ) -> Result<CoreType, LegacyIngestError> {
+    ) -> Result<EncodedType, LegacyIngestError> {
         let variants = enumeration
             .variants
             .iter()
             .map(|variant| {
-                Ok(CoreVariant::new(
+                Ok(EncodedVariant::new(
                     self.intern(variant.name.as_str()),
                     variant
                         .payload
@@ -128,7 +129,7 @@ impl LegacySchemaIngest {
                 ))
             })
             .collect::<Result<Vec<_>, LegacyIngestError>>()?;
-        Ok(CoreType::Enumeration(CoreEnum::new(
+        Ok(EncodedType::Enumeration(EncodedEnum::new(
             self.intern(enumeration.name.as_str()),
             variants,
         )))
@@ -137,18 +138,18 @@ impl LegacySchemaIngest {
     fn migrate_reference(
         &mut self,
         reference: &TypeReference,
-    ) -> Result<CoreReference, LegacyIngestError> {
+    ) -> Result<EncodedReference, LegacyIngestError> {
         Ok(match reference {
-            TypeReference::String => CoreReference::String,
-            TypeReference::Integer => CoreReference::Integer,
-            TypeReference::Boolean => CoreReference::Boolean,
-            TypeReference::Bytes => CoreReference::Bytes,
+            TypeReference::String => EncodedReference::String,
+            TypeReference::Integer => EncodedReference::Integer,
+            TypeReference::Boolean => EncodedReference::Boolean,
+            TypeReference::Bytes => EncodedReference::Bytes,
             TypeReference::Path => return Err(LegacyIngestError::UnsupportedPath),
-            TypeReference::Plain(name) => CoreReference::Plain(self.intern(name.as_str())),
+            TypeReference::Plain(name) => EncodedReference::Plain(self.intern(name.as_str())),
             TypeReference::SingleTypeApplication {
                 projection,
                 argument,
-            } => CoreReference::SingleTypeApplication {
+            } => EncodedReference::SingleTypeApplication {
                 projection: match projection {
                     LegacySingleProjection::Vector => SingleTypeReferenceProjection::Vector,
                     LegacySingleProjection::Optional => SingleTypeReferenceProjection::Optional,
@@ -159,7 +160,7 @@ impl LegacySchemaIngest {
             TypeReference::MultiTypeApplication {
                 projection,
                 arguments,
-            } => CoreReference::MultiTypeApplication {
+            } => EncodedReference::MultiTypeApplication {
                 projection: match projection {
                     LegacyMultiProjection::Map => MultiTypeReferenceProjection::Map,
                 },
@@ -169,7 +170,7 @@ impl LegacySchemaIngest {
                     .collect::<Result<Vec<_>, _>>()?,
             },
             TypeReference::ValueApplication { projection, value } => {
-                CoreReference::ValueApplication {
+                EncodedReference::ValueApplication {
                     projection: match projection {
                         LegacyValueProjection::Bytes => ValueReferenceProjection::Bytes,
                     },
@@ -190,7 +191,7 @@ impl LegacySchemaIngest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_schema::{CoreType, TextualSchema};
+    use core_schema::{EncodedType, TextualSchema};
     use name_table::NameResolver;
 
     /// A string-free six-slot document — no `Text`/`String` divergence — so the
@@ -213,7 +214,7 @@ mod tests {
     /// payload)])`, resolved through the schema's own names — the comparable form
     /// that abstracts over each front end's private identifier binding.
     fn input_surface(
-        schema: &CoreSchema,
+        schema: &EncodedSchema,
         names: &impl NameResolver,
     ) -> (String, Vec<(String, String)>) {
         let root = schema.input().expect("an input interface root");
@@ -222,7 +223,7 @@ mod tests {
             DeclarationRole::InterfaceInput,
             "the input root carries the InterfaceInput role"
         );
-        let CoreType::Enumeration(enumeration) = root.value() else {
+        let EncodedType::Enumeration(enumeration) = root.value() else {
             panic!("an interface root is an enumeration");
         };
         let root_name = names
@@ -240,7 +241,7 @@ mod tests {
                     .as_str()
                     .to_owned();
                 let payload = match variant.payload() {
-                    Some(CoreReference::Plain(id)) => {
+                    Some(EncodedReference::Plain(id)) => {
                         names.resolve(*id).unwrap().as_str().to_owned()
                     }
                     other => panic!("interface payloads are Plain references, got {other:?}"),

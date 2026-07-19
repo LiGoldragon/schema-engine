@@ -1,24 +1,24 @@
 [package]
 name="schema-engine"
-version="0.1.0"
+version="0.2.0"
 edition="2024"
 rust-version="1.89"
 license="MIT OR Apache-2.0"
 repository="https://github.com/LiGoldragon/schema-engine"
 description="Core-first Schema daemon and thin CLI"
 [dependencies]
-core-schema={git="https://github.com/LiGoldragon/core-schema.git",rev="26a480777a7b95e6bb825ce14d4527596bf95dbf"}
-content-identity={git="https://github.com/LiGoldragon/protos.git",rev="7e60f60fbc144265cf5ac1ec238b87744967d4eb"}
-name-table={git="https://github.com/LiGoldragon/protos.git",rev="7e60f60fbc144265cf5ac1ec238b87744967d4eb"}
+core-schema={git="https://github.com/LiGoldragon/core-schema.git",rev="1122370fbe3f65c56957431714a19c3920365466"}
+content-identity={git="https://github.com/LiGoldragon/protos.git",rev="f12a80c85d9d27ac4432b86b7d3095e8387c6fa9"}
+name-table={git="https://github.com/LiGoldragon/protos.git",rev="f12a80c85d9d27ac4432b86b7d3095e8387c6fa9"}
 schema-language={git="https://github.com/LiGoldragon/schema-language.git",rev="9c217610c4b8"}
 kameo={git="https://github.com/LiGoldragon/kameo.git",rev="f491b45d7dcb55e5837eddde3d5d7ca8ceaa9f01",default-features=false,features=["macros"]}
 rkyv={version="0.8",features=["bytecheck"]}
-signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="d8aeae0814b026a8de6bf40e86432cb37d022762"}
-signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git",rev="21c3ad78227ec847bda37cfa2494619cdf1b0b70"}
+signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="0c4b945d942ada0939fef304a155949faad5b607"}
+signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git",rev="25ac4fd0abf5d58ab9fce1f10d58220b62bef902"}
 tokio={version="1",features=["macros","rt-multi-thread","net","io-util","fs","sync"]}
 thiserror="2"
 [dev-dependencies]
-sema-storage={git="https://github.com/LiGoldragon/sema-storage.git",rev="11b22604df15351f1241e3bfd3d47bd9a1b4f362"}
+sema-storage={git="https://github.com/LiGoldragon/sema-storage.git",rev="a2516082061063447ed5e346a0415118b4c0edfa"}
 tempfile="3"
 [lints.rust]
 unsafe_code="forbid"

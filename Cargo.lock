@@ -94,7 +94,7 @@ checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 [[package]]
 name = "content-identity"
 version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/protos.git?rev=7e60f60fbc144265cf5ac1ec238b87744967d4eb#7e60f60fbc144265cf5ac1ec238b87744967d4eb"
+source = "git+https://github.com/LiGoldragon/protos.git?rev=f12a80c85d9d27ac4432b86b7d3095e8387c6fa9#f12a80c85d9d27ac4432b86b7d3095e8387c6fa9"
 dependencies = [
  "blake3",
  "rkyv",
@@ -103,8 +103,8 @@ dependencies = [
 
 [[package]]
 name = "core-logos"
-version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/core-logos.git?rev=c25b5f58205adc34b9ec940634d0f50fdfb0cc3d#c25b5f58205adc34b9ec940634d0f50fdfb0cc3d"
+version = "0.2.0"
+source = "git+https://github.com/LiGoldragon/core-logos.git?rev=22b12a474c86cf812c89b41054d4e26e870ec70c#22b12a474c86cf812c89b41054d4e26e870ec70c"
 dependencies = [
  "content-identity",
  "name-table",
@@ -114,8 +114,8 @@ dependencies = [
 
 [[package]]
 name = "core-schema"
-version = "0.3.0"
-source = "git+https://github.com/LiGoldragon/core-schema.git?rev=26a480777a7b95e6bb825ce14d4527596bf95dbf#26a480777a7b95e6bb825ce14d4527596bf95dbf"
+version = "0.4.0"
+source = "git+https://github.com/LiGoldragon/core-schema.git?rev=1122370fbe3f65c56957431714a19c3920365466#1122370fbe3f65c56957431714a19c3920365466"
 dependencies = [
  "content-identity",
  "name-table",
@@ -382,7 +382,7 @@ dependencies = [
 [[package]]
 name = "name-table"
 version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/protos.git?rev=7e60f60fbc144265cf5ac1ec238b87744967d4eb#7e60f60fbc144265cf5ac1ec238b87744967d4eb"
+source = "git+https://github.com/LiGoldragon/protos.git?rev=f12a80c85d9d27ac4432b86b7d3095e8387c6fa9#f12a80c85d9d27ac4432b86b7d3095e8387c6fa9"
 dependencies = [
  "content-identity",
  "rkyv",
@@ -482,7 +482,7 @@ dependencies = [
 [[package]]
 name = "raw-discovery"
 version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/protos.git?rev=7e60f60fbc144265cf5ac1ec238b87744967d4eb#7e60f60fbc144265cf5ac1ec238b87744967d4eb"
+source = "git+https://github.com/LiGoldragon/protos.git?rev=f12a80c85d9d27ac4432b86b7d3095e8387c6fa9#f12a80c85d9d27ac4432b86b7d3095e8387c6fa9"
 dependencies = [
  "content-identity",
  "rkyv",
@@ -558,7 +558,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "schema-engine"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "content-identity",
  "core-schema",
@@ -610,8 +610,8 @@ dependencies = [
 
 [[package]]
 name = "sema-storage"
-version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/sema-storage.git?rev=11b22604df15351f1241e3bfd3d47bd9a1b4f362#11b22604df15351f1241e3bfd3d47bd9a1b4f362"
+version = "0.2.0"
+source = "git+https://github.com/LiGoldragon/sema-storage.git?rev=a2516082061063447ed5e346a0415118b4c0edfa#a2516082061063447ed5e346a0415118b4c0edfa"
 dependencies = [
  "kameo",
  "name-table",
@@ -682,8 +682,8 @@ dependencies = [
 
 [[package]]
 name = "signal-schema"
-version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/signal-schema.git?rev=d8aeae0814b026a8de6bf40e86432cb37d022762#d8aeae0814b026a8de6bf40e86432cb37d022762"
+version = "0.3.0"
+source = "git+https://github.com/LiGoldragon/signal-schema.git?rev=0c4b945d942ada0939fef304a155949faad5b607#0c4b945d942ada0939fef304a155949faad5b607"
 dependencies = [
  "rkyv",
  "signal-sema-storage",
@@ -701,8 +701,8 @@ dependencies = [
 
 [[package]]
 name = "signal-sema-storage"
-version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/signal-sema-storage.git?rev=21c3ad78227ec847bda37cfa2494619cdf1b0b70#21c3ad78227ec847bda37cfa2494619cdf1b0b70"
+version = "0.2.0"
+source = "git+https://github.com/LiGoldragon/signal-sema-storage.git?rev=25ac4fd0abf5d58ab9fce1f10d58220b62bef902#25ac4fd0abf5d58ab9fce1f10d58220b62bef902"
 dependencies = [
  "content-identity",
  "core-logos",
@@ -737,8 +737,8 @@ dependencies = [
 
 [[package]]
 name = "structural-codec"
-version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/protos.git?rev=7e60f60fbc144265cf5ac1ec238b87744967d4eb#7e60f60fbc144265cf5ac1ec238b87744967d4eb"
+version = "0.3.0"
+source = "git+https://github.com/LiGoldragon/protos.git?rev=f12a80c85d9d27ac4432b86b7d3095e8387c6fa9#f12a80c85d9d27ac4432b86b7d3095e8387c6fa9"
 dependencies = [
  "content-identity",
  "name-table",

@@ -1,13 +1,13 @@
 //! The keystone equivalence witness: one declared schema unit, ingested through the
 //! LEGACY front end (`schema-language` migration) and through the NATIVE front end
 //! (`core-schema` six-slot document decode), BOTH bound through one central identity
-//! authority (a live `sema-storage` runtime), yields IDENTICAL `CoreSchema` content
+//! authority (a live `sema-storage` runtime), yields IDENTICAL `EncodedSchema` content
 //! identity.
 //!
 //! This is the equivalence the whole authority-provided universe path exists to
 //! guarantee: the two front ends parse the same source into different private name
 //! tables (their interior identifiers disagree), but binding through the one authority
-//! and rebuilding via `CoreUniverse::from_assignment` — which re-stamps every interior
+//! and rebuilding via `EncodedUniverse::from_assignment` — which re-stamps every interior
 //! name into a canonical order — collapses that difference. Two ingestions of one
 //! declared schema-whole that received the same assignment build byte-identical Core
 //! content.
@@ -28,7 +28,7 @@
 //! ([`legacy_and_native_ingest_to_identical_core_identity`]) is KEPT: it guards the
 //! canonicalisation independently of the specific `spirit-min` shape.
 
-use core_schema::{CoreReference, CoreType};
+use core_schema::{EncodedReference, EncodedType};
 use schema_engine::ParsedSchema;
 use sema_storage::Runtime;
 use signal_sema_storage::{BoundIdentities, Reply, Request, SchemaWholeHandle};
@@ -73,7 +73,7 @@ const SPIRIT_MIN: &str = include_str!("fixtures/spirit-min.schema");
 
 /// Ingest one source through BOTH front ends, bind each against the one authority under
 /// the same schema-whole handle, and assert the two built universes carry identical
-/// `CoreSchema` content identity. This is the whole point of the authority-provided
+/// `EncodedSchema` content identity. This is the whole point of the authority-provided
 /// universe path: two front ends that intern into disagreeing private name tables,
 /// re-stamped through one assignment, collapse to byte-identical Core content.
 async fn assert_front_ends_agree(source: &str, whole_key: &[u8]) {
@@ -111,7 +111,7 @@ async fn assert_front_ends_agree(source: &str, whole_key: &[u8]) {
     assert_eq!(
         legacy_identity, native_identity,
         "one authority, two front ends: the same declared schema unit yields identical \
-         CoreSchema content identity",
+         EncodedSchema content identity",
     );
 
     runtime.shutdown().await.expect("shutdown authority");
@@ -126,7 +126,7 @@ async fn legacy_and_native_ingest_to_identical_core_identity() {
 
 /// The keystone, on the REAL fixture: `spirit-min` ITSELF — with its direct `String`
 /// scalars and its single-field braced `Summary.{ Description }` — ingests through both
-/// front ends to identical `CoreSchema` content identity, now that the native front end
+/// front ends to identical `EncodedSchema` content identity, now that the native front end
 /// has converged onto the 2026-07-17 rulings.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn spirit_min_ingests_to_identical_core_identity() {
@@ -151,7 +151,7 @@ fn assert_summary_is_a_newtype_over_description(parsed: &ParsedSchema, front_end
         })
         .unwrap_or_else(|| panic!("{front_end}: spirit-min declares Summary"));
 
-    let CoreType::Newtype(newtype) = summary.value() else {
+    let EncodedType::Newtype(newtype) = summary.value() else {
         panic!(
             "{front_end}: single-field braced Summary.{{ Description }} must lower to a newtype \
              (beads .36 ruling: a single-field brace is a newtype), found {:?}",
@@ -159,7 +159,7 @@ fn assert_summary_is_a_newtype_over_description(parsed: &ParsedSchema, front_end
         );
     };
 
-    let CoreReference::Plain(target) = newtype.reference() else {
+    let EncodedReference::Plain(target) = newtype.reference() else {
         panic!(
             "{front_end}: Summary's newtype target must be the declared type Description, found {:?}",
             newtype.reference()
