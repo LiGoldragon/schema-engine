@@ -177,13 +177,14 @@ fn assert_summary_is_a_newtype_over_description(parsed: &ParsedSchema, front_end
 }
 
 /// The missing round-trip witness (review item on beads .36): the NATIVE `core-schema`
-/// six-slot document decode lowers `Summary.{ Description }` from the real `spirit-min`
+/// seven-slot document decode lowers `Summary.{ Description }` from the real `spirit-min`
 /// fixture to a newtype over `Description`. The legacy front end is asserted alongside
 /// so the both-sides ruling is pinned directly, not only inferred from hash equality.
 #[test]
 fn native_decode_lowers_single_field_brace_summary_to_a_newtype() {
+    let native_source = format!("{SPIRIT_MIN}\n[]");
     let native =
-        ParsedSchema::from_native(SPIRIT_MIN).expect("native front end decodes spirit-min");
+        ParsedSchema::from_native(&native_source).expect("native front end decodes spirit-min");
     assert_summary_is_a_newtype_over_description(&native, "native");
 
     let legacy =
