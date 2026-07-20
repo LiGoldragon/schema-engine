@@ -1,15 +1,15 @@
 //! The authority-bound ingestion path: parsed schema declarations → central-authority
-//! identity binding → canonical `CoreUniverse`.
+//! identity binding → canonical `EncodedUniverse`.
 //!
 //! Both front ends — the LEGACY `schema-language` migration and the NATIVE `core-schema`
-//! six-slot document decode — land in the same [`ParsedSchema`]: stringless Core
+//! six-slot document decode — land in the same [`ParsedSchema`]: stringless encoded form
 //! declarations plus the name space they were parsed against. From there the path is
 //! identical for both, which is exactly what makes the equivalence witness meaningful:
 //! compute one [`DeclaredIdentity`] per declaration, bind-or-mint them against the one
 //! central authority (`sema-storage`), and build the universe from the authority's
-//! assignment via [`CoreUniverse::from_assignment`]. Because that build re-stamps every
+//! assignment via [`EncodedUniverse::from_assignment`]. Because that build re-stamps every
 //! interior name into a canonical order, two ingestions of one declared schema-whole that
-//! received the same assignment produce byte-identical Core content — the keystone.
+//! received the same assignment produce byte-identical encoded-form content — the keystone.
 //!
 //! The self-contained migration in [`crate::Dispatch`] (the `IngestTypeSchema` request,
 //! which stores the migrated schema directly with its own parse-order name table) is the
@@ -31,12 +31,12 @@
 //! than folding raw identifiers.)
 
 use content_identity::IdentityHasher;
-use core_schema::declaration::{CoreDeclaration, CoreField, CoreVariant};
+use core_schema::declaration::{EncodedDeclaration, EncodedField, EncodedVariant};
 use core_schema::{
-    AssignedKind, AssignedMember, CoreReference, CoreSchema, CoreType, CoreUniverse,
-    CoreUniverseId, DeclarationRole, TextualError, TextualSchema, UniverseError, Visibility,
+    AssignedKind, AssignedMember, DeclarationRole, EncodedReference, EncodedSchema, EncodedType,
+    EncodedUniverse, EncodedUniverseId, TextualError, TextualSchema, UniverseError, Visibility,
 };
-use name_table::{NameTable, NameTableError};
+use name_table::{IdentifierNamespace, NameTable, NameTableError};
 use signal_sema_storage::{
     BoundIdentities, DeclaredIdentity, DeclaredKey, DeclaredShape, IdentityIntent,
 };
@@ -58,17 +58,17 @@ pub enum AuthorityIngestError {
     UnboundDeclaration(Vec<u8>),
 }
 
-/// One schema unit parsed from a single front end: its stringless Core declarations and
+/// One schema unit parsed from a single front end: its stringless encoded form declarations and
 /// the name space they were parsed against. The two constructors are the two front ends;
 /// every method below is front-end agnostic.
 pub struct ParsedSchema {
-    schema: CoreSchema,
+    schema: EncodedSchema,
     names: NameTable,
 }
 
 impl ParsedSchema {
     /// Parse through the LEGACY front end: `schema-language` lowering, migrated into the
-    /// stringless Core substrate.
+    /// stringless encoded form substrate.
     pub fn from_legacy(text: &str) -> Result<Self, AuthorityIngestError> {
         let migration = LegacySchemaIngest::migrate_text(text)?;
         Ok(Self {
@@ -79,12 +79,12 @@ impl ParsedSchema {
 
     /// Parse through the NATIVE front end: `core-schema`'s six-slot document decode.
     pub fn from_native(text: &str) -> Result<Self, AuthorityIngestError> {
-        let mut names = NameTable::new();
+        let mut names = NameTable::new(IdentifierNamespace::Schema);
         let schema = TextualSchema::schema_document()?.decode_document(text, &mut names)?;
         Ok(Self { schema, names })
     }
 
-    pub fn schema(&self) -> &CoreSchema {
+    pub fn schema(&self) -> &EncodedSchema {
         &self.schema
     }
 
@@ -111,16 +111,16 @@ impl ParsedSchema {
             .collect()
     }
 
-    /// Build the canonical [`CoreUniverse`] from the authority's reply: one assigned
+    /// Build the canonical [`EncodedUniverse`] from the authority's reply: one assigned
     /// member per declaration at the authority's local identity, then
-    /// [`CoreUniverse::from_assignment`] re-stamps every interior name into a canonical
+    /// [`EncodedUniverse::from_assignment`] re-stamps every interior name into a canonical
     /// order. The built universe's content identity is a pure function of (assignment,
     /// declaration content) — so two front ends bound to one authority build identical
-    /// Core content.
+    /// encoded-form content.
     pub fn build_universe(
         &self,
         bound: &BoundIdentities,
-    ) -> Result<CoreUniverse, AuthorityIngestError> {
+    ) -> Result<EncodedUniverse, AuthorityIngestError> {
         let members = self
             .schema
             .declarations()
@@ -142,8 +142,8 @@ impl ParsedSchema {
                 ))
             })
             .collect::<Result<Vec<_>, AuthorityIngestError>>()?;
-        Ok(CoreUniverse::from_assignment(
-            CoreUniverseId::new(bound.universe.0),
+        Ok(EncodedUniverse::from_assignment(
+            EncodedUniverseId::new(bound.universe.0),
             members,
             &self.names,
         )?)
@@ -153,7 +153,7 @@ impl ParsedSchema {
     /// `declared-key-is-name`).
     fn declared_key(
         &self,
-        declaration: &CoreDeclaration,
+        declaration: &EncodedDeclaration,
     ) -> Result<DeclaredKey, AuthorityIngestError> {
         let name = self.names.resolve(declaration.identifier())?;
         Ok(DeclaredKey(name.as_str().as_bytes().to_vec()))
@@ -163,7 +163,7 @@ impl ParsedSchema {
     /// it is a function of the declared structure rather than of raw interned ids.
     fn declared_shape(
         &self,
-        declaration: &CoreDeclaration,
+        declaration: &EncodedDeclaration,
     ) -> Result<DeclaredShape, AuthorityIngestError> {
         let role_tag = match declaration.role() {
             DeclarationRole::DataType => 0u8,
@@ -177,18 +177,18 @@ impl ParsedSchema {
         let mut hasher = IdentityHasher::unprimed();
         hasher.update_raw(&[role_tag, visibility_tag]);
         match declaration.value() {
-            CoreType::Newtype(newtype) => {
+            EncodedType::Newtype(newtype) => {
                 hasher.update_raw(&[0]);
                 self.fold_reference(&mut hasher, newtype.reference())?;
             }
-            CoreType::Struct(structure) => {
+            EncodedType::Struct(structure) => {
                 hasher.update_raw(&[1]);
                 hasher.update_raw(&(structure.fields().len() as u64).to_le_bytes());
                 for field in structure.fields() {
                     self.fold_field(&mut hasher, field)?;
                 }
             }
-            CoreType::Enumeration(enumeration) => {
+            EncodedType::Enumeration(enumeration) => {
                 hasher.update_raw(&[2]);
                 hasher.update_raw(&(enumeration.variants().len() as u64).to_le_bytes());
                 for variant in enumeration.variants() {
@@ -202,7 +202,7 @@ impl ParsedSchema {
     fn fold_field(
         &self,
         hasher: &mut IdentityHasher,
-        field: &CoreField,
+        field: &EncodedField,
     ) -> Result<(), NameTableError> {
         hasher.update_length_prefixed(self.names.resolve(field.identifier())?.as_str().as_bytes());
         self.fold_reference(hasher, field.reference())
@@ -211,7 +211,7 @@ impl ParsedSchema {
     fn fold_variant(
         &self,
         hasher: &mut IdentityHasher,
-        variant: &CoreVariant,
+        variant: &EncodedVariant,
     ) -> Result<(), NameTableError> {
         hasher.update_length_prefixed(
             self.names
@@ -234,33 +234,33 @@ impl ParsedSchema {
     fn fold_reference(
         &self,
         hasher: &mut IdentityHasher,
-        reference: &CoreReference,
+        reference: &EncodedReference,
     ) -> Result<(), NameTableError> {
         match reference {
-            CoreReference::String => {
+            EncodedReference::String => {
                 hasher.update_raw(&[0]);
             }
-            CoreReference::Integer => {
+            EncodedReference::Integer => {
                 hasher.update_raw(&[1]);
             }
-            CoreReference::Boolean => {
+            EncodedReference::Boolean => {
                 hasher.update_raw(&[2]);
             }
-            CoreReference::Bytes => {
+            EncodedReference::Bytes => {
                 hasher.update_raw(&[3]);
             }
-            CoreReference::Plain(identifier) => {
+            EncodedReference::Plain(identifier) => {
                 hasher.update_raw(&[4]);
                 hasher.update_length_prefixed(self.names.resolve(*identifier)?.as_str().as_bytes());
             }
-            CoreReference::SingleTypeApplication {
+            EncodedReference::SingleTypeApplication {
                 projection,
                 argument,
             } => {
                 hasher.update_raw(&[5, *projection as u8]);
                 self.fold_reference(hasher, argument)?;
             }
-            CoreReference::MultiTypeApplication {
+            EncodedReference::MultiTypeApplication {
                 projection,
                 arguments,
             } => {
@@ -270,7 +270,7 @@ impl ParsedSchema {
                     self.fold_reference(hasher, argument)?;
                 }
             }
-            CoreReference::ValueApplication { projection, value } => {
+            EncodedReference::ValueApplication { projection, value } => {
                 hasher.update_raw(&[7, *projection as u8]);
                 hasher.update_raw(&value.to_le_bytes());
             }

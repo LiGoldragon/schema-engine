@@ -1,9 +1,10 @@
 use core_schema::{
-    CoreDeclaration, CoreEnum, CoreField, CoreNewtype, CoreReference, CoreSchema, CoreStruct,
-    CoreType, CoreVariant, DeclarationRole, MultiTypeReferenceProjection,
-    SingleTypeReferenceProjection, ValueReferenceProjection, Visibility,
+    DeclarationRole, EncodedDeclaration, EncodedEnum, EncodedField, EncodedNewtype,
+    EncodedReference, EncodedSchema, EncodedStruct, EncodedType, EncodedVariant,
+    MultiTypeReferenceProjection, SingleTypeReferenceProjection, ValueReferenceProjection,
+    Visibility,
 };
-use name_table::{Identifier, Name, NameTable};
+use name_table::{Identifier, IdentifierNamespace, Name, NameTable, NameTableError};
 use schema_language::{
     Declaration, EnumDeclaration, MultiTypeReferenceProjection as LegacyMultiProjection, Root,
     SchemaEngine, SchemaIdentity, SingleTypeReferenceProjection as LegacySingleProjection,
@@ -14,6 +15,8 @@ use schema_language::{
 pub enum LegacyIngestError {
     #[error("legacy schema lowering: {0}")]
     Lower(#[from] schema_language::SchemaError),
+    #[error("name table: {0}")]
+    Names(#[from] NameTableError),
     #[error("unsupported legacy Path scalar")]
     UnsupportedPath,
     #[error("unsupported user-defined generic application")]
@@ -23,7 +26,7 @@ pub enum LegacyIngestError {
 }
 
 pub struct LegacyMigration {
-    pub schema: CoreSchema,
+    pub schema: EncodedSchema,
     pub names: NameTable,
 }
 
@@ -36,7 +39,7 @@ impl LegacySchemaIngest {
         let source =
             SchemaEngine::default().lower_source(text, SchemaIdentity::new("legacy-edge", "0"))?;
         let mut ingest = Self {
-            names: NameTable::new(),
+            names: NameTable::new(IdentifierNamespace::Schema),
         };
         let mut declarations = source
             .namespace()
@@ -52,7 +55,7 @@ impl LegacySchemaIngest {
         declarations.push(ingest.migrate_interface(&input, DeclarationRole::InterfaceInput)?);
         declarations.push(ingest.migrate_interface(&output, DeclarationRole::InterfaceOutput)?);
         Ok(LegacyMigration {
-            schema: CoreSchema::new(declarations),
+            schema: EncodedSchema::new(declarations),
             names: ingest.names,
         })
     }
@@ -65,11 +68,11 @@ impl LegacySchemaIngest {
         &mut self,
         root: &Root,
         role: DeclarationRole,
-    ) -> Result<CoreDeclaration, LegacyIngestError> {
+    ) -> Result<EncodedDeclaration, LegacyIngestError> {
         let enumeration = root
             .as_enum()
             .ok_or(LegacyIngestError::UnsupportedInterfaceApplication)?;
-        Ok(CoreDeclaration::interface(
+        Ok(EncodedDeclaration::interface(
             role,
             self.migrate_enumeration(enumeration)?,
         ))
@@ -78,10 +81,10 @@ impl LegacySchemaIngest {
     fn migrate_declaration(
         &mut self,
         declaration: &Declaration,
-    ) -> Result<CoreDeclaration, LegacyIngestError> {
+    ) -> Result<EncodedDeclaration, LegacyIngestError> {
         let value = match declaration.value() {
-            TypeDeclaration::Newtype(newtype) => CoreType::Newtype(CoreNewtype::new(
-                self.intern(newtype.name.as_str()),
+            TypeDeclaration::Newtype(newtype) => EncodedType::Newtype(EncodedNewtype::new(
+                self.intern(newtype.name.as_str())?,
                 self.migrate_reference(&newtype.reference)?,
             )),
             TypeDeclaration::Struct(structure) => {
@@ -89,14 +92,14 @@ impl LegacySchemaIngest {
                     .fields
                     .iter()
                     .map(|field| {
-                        Ok(CoreField::new(
-                            self.intern(field.name.as_str()),
+                        Ok(EncodedField::new(
+                            self.intern(field.name.as_str())?,
                             self.migrate_reference(&field.reference)?,
                         ))
                     })
                     .collect::<Result<Vec<_>, LegacyIngestError>>()?;
-                CoreType::Struct(CoreStruct::new(
-                    self.intern(structure.name.as_str()),
+                EncodedType::Struct(EncodedStruct::new(
+                    self.intern(structure.name.as_str())?,
                     fields,
                 ))
             }
@@ -107,19 +110,19 @@ impl LegacySchemaIngest {
         } else {
             Visibility::Public
         };
-        Ok(CoreDeclaration::new(visibility, value))
+        Ok(EncodedDeclaration::new(visibility, value))
     }
 
     fn migrate_enumeration(
         &mut self,
         enumeration: &EnumDeclaration,
-    ) -> Result<CoreType, LegacyIngestError> {
+    ) -> Result<EncodedType, LegacyIngestError> {
         let variants = enumeration
             .variants
             .iter()
             .map(|variant| {
-                Ok(CoreVariant::new(
-                    self.intern(variant.name.as_str()),
+                Ok(EncodedVariant::new(
+                    self.intern(variant.name.as_str())?,
                     variant
                         .payload
                         .as_ref()
@@ -128,8 +131,8 @@ impl LegacySchemaIngest {
                 ))
             })
             .collect::<Result<Vec<_>, LegacyIngestError>>()?;
-        Ok(CoreType::Enumeration(CoreEnum::new(
-            self.intern(enumeration.name.as_str()),
+        Ok(EncodedType::Enumeration(EncodedEnum::new(
+            self.intern(enumeration.name.as_str())?,
             variants,
         )))
     }
@@ -137,18 +140,18 @@ impl LegacySchemaIngest {
     fn migrate_reference(
         &mut self,
         reference: &TypeReference,
-    ) -> Result<CoreReference, LegacyIngestError> {
+    ) -> Result<EncodedReference, LegacyIngestError> {
         Ok(match reference {
-            TypeReference::String => CoreReference::String,
-            TypeReference::Integer => CoreReference::Integer,
-            TypeReference::Boolean => CoreReference::Boolean,
-            TypeReference::Bytes => CoreReference::Bytes,
+            TypeReference::String => EncodedReference::String,
+            TypeReference::Integer => EncodedReference::Integer,
+            TypeReference::Boolean => EncodedReference::Boolean,
+            TypeReference::Bytes => EncodedReference::Bytes,
             TypeReference::Path => return Err(LegacyIngestError::UnsupportedPath),
-            TypeReference::Plain(name) => CoreReference::Plain(self.intern(name.as_str())),
+            TypeReference::Plain(name) => EncodedReference::Plain(self.intern(name.as_str())?),
             TypeReference::SingleTypeApplication {
                 projection,
                 argument,
-            } => CoreReference::SingleTypeApplication {
+            } => EncodedReference::SingleTypeApplication {
                 projection: match projection {
                     LegacySingleProjection::Vector => SingleTypeReferenceProjection::Vector,
                     LegacySingleProjection::Optional => SingleTypeReferenceProjection::Optional,
@@ -159,7 +162,7 @@ impl LegacySchemaIngest {
             TypeReference::MultiTypeApplication {
                 projection,
                 arguments,
-            } => CoreReference::MultiTypeApplication {
+            } => EncodedReference::MultiTypeApplication {
                 projection: match projection {
                     LegacyMultiProjection::Map => MultiTypeReferenceProjection::Map,
                 },
@@ -169,7 +172,7 @@ impl LegacySchemaIngest {
                     .collect::<Result<Vec<_>, _>>()?,
             },
             TypeReference::ValueApplication { projection, value } => {
-                CoreReference::ValueApplication {
+                EncodedReference::ValueApplication {
                     projection: match projection {
                         LegacyValueProjection::Bytes => ValueReferenceProjection::Bytes,
                     },
@@ -182,21 +185,20 @@ impl LegacySchemaIngest {
         })
     }
 
-    fn intern(&mut self, spelling: &str) -> Identifier {
-        self.names.intern(Name::new(spelling))
+    fn intern(&mut self, spelling: &str) -> Result<Identifier, LegacyIngestError> {
+        Ok(self.names.intern(Name::new(spelling))?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_schema::{CoreType, TextualSchema};
+    use core_schema::{EncodedType, TextualSchema};
     use name_table::NameResolver;
 
-    /// A string-free six-slot document — no `Text`/`String` divergence — so the
-    /// legacy engine (`schema-language`) and the native document decode
-    /// (`core-schema`) parse the very same source, and their interface surfaces can
-    /// be compared directly.
+    /// A string-free six-slot legacy document — no `Text`/`String` divergence.
+    /// The native seven-slot grammar receives this source with one empty trailing
+    /// streaming vector, so both front ends fill comparable interface declarations.
     const SHARED_MIN: &str = "\
 {}
 [Ping.Beat Poke.Nudge]
@@ -213,7 +215,7 @@ mod tests {
     /// payload)])`, resolved through the schema's own names — the comparable form
     /// that abstracts over each front end's private identifier binding.
     fn input_surface(
-        schema: &CoreSchema,
+        schema: &EncodedSchema,
         names: &impl NameResolver,
     ) -> (String, Vec<(String, String)>) {
         let root = schema.input().expect("an input interface root");
@@ -222,7 +224,7 @@ mod tests {
             DeclarationRole::InterfaceInput,
             "the input root carries the InterfaceInput role"
         );
-        let CoreType::Enumeration(enumeration) = root.value() else {
+        let EncodedType::Enumeration(enumeration) = root.value() else {
             panic!("an interface root is an enumeration");
         };
         let root_name = names
@@ -240,7 +242,7 @@ mod tests {
                     .as_str()
                     .to_owned();
                 let payload = match variant.payload() {
-                    Some(CoreReference::Plain(id)) => {
+                    Some(EncodedReference::Plain(id)) => {
                         names.resolve(*id).unwrap().as_str().to_owned()
                     }
                     other => panic!("interface payloads are Plain references, got {other:?}"),
@@ -294,18 +296,20 @@ mod tests {
         );
     }
 
-    /// The native document decode and legacy ingestion fill the SAME interface
-    /// representation: for the same source they agree on the interface surface —
+    /// The native seven-slot document decode and six-slot legacy ingestion fill the SAME
+    /// interface representation: after adding the empty streaming vector to the native input,
+    /// they agree on the interface surface —
     /// root name, variant names, and payload names. Content-hash equality is a
     /// separate queued slice (identifier binding) and is deliberately not asserted.
     #[test]
     fn native_and_legacy_agree_on_the_interface_surface() {
         let legacy = LegacySchemaIngest::migrate_text(SHARED_MIN).expect("legacy ingestion");
 
-        let mut native_names = name_table::NameTable::new();
+        let mut native_names = name_table::NameTable::new(IdentifierNamespace::Schema);
+        let native_source = format!("{SHARED_MIN}\n[]");
         let native = TextualSchema::schema_document()
             .expect("build the document grammar")
-            .decode_document(SHARED_MIN, &mut native_names)
+            .decode_document(&native_source, &mut native_names)
             .expect("native document decode");
 
         assert_eq!(

@@ -31,14 +31,12 @@ pub enum Error {
     #[error("actor: {0}")]
     Actor(String),
 }
-type Result<T> = std::result::Result<T, Error>;
-
 pub struct SemaPlane {
     socket: PathBuf,
     commits: u64,
 }
 impl SemaPlane {
-    async fn read_frame(&self, stream: &mut UnixStream) -> Result<Vec<u8>> {
+    async fn read_frame(&self, stream: &mut UnixStream) -> std::result::Result<Vec<u8>, Error> {
         let length = stream.read_u32().await? as usize;
         let mut frame = Vec::with_capacity(length + 4);
         frame.extend_from_slice(&(length as u32).to_be_bytes());
@@ -47,7 +45,7 @@ impl SemaPlane {
         Ok(frame)
     }
 
-    async fn exchange(&self, request: &SemaRequest) -> Result<SemaReply> {
+    async fn exchange(&self, request: &SemaRequest) -> std::result::Result<SemaReply, Error> {
         let mut stream = UnixStream::connect(&self.socket).await?;
         stream
             .write_all(
@@ -90,7 +88,7 @@ impl Actor for SemaPlane {
 }
 pub struct Commit(pub SemaRequest);
 impl Message<Commit> for SemaPlane {
-    type Reply = Result<SemaReply>;
+    type Reply = std::result::Result<SemaReply, Error>;
     async fn handle(&mut self, message: Commit, _: &mut Context<Self, Self::Reply>) -> Self::Reply {
         self.commits += 1;
         self.exchange(&message.0).await
@@ -114,7 +112,7 @@ impl Actor for NexusPlane {
 }
 pub struct Dispatch(pub SchemaRequest);
 impl Message<Dispatch> for NexusPlane {
-    type Reply = Result<SchemaReply>;
+    type Reply = std::result::Result<SchemaReply, Error>;
     async fn handle(
         &mut self,
         message: Dispatch,
@@ -242,7 +240,7 @@ impl Actor for SignalPlane {
     }
 }
 impl Message<Dispatch> for SignalPlane {
-    type Reply = Result<SchemaReply>;
+    type Reply = std::result::Result<SchemaReply, Error>;
     async fn handle(
         &mut self,
         message: Dispatch,
@@ -279,7 +277,7 @@ impl Runtime {
             events,
         }
     }
-    pub async fn request(&self, request: SchemaRequest) -> Result<SchemaReply> {
+    pub async fn request(&self, request: SchemaRequest) -> std::result::Result<SchemaReply, Error> {
         self.signal
             .ask(Dispatch(request))
             .send()

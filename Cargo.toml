@@ -1,20 +1,20 @@
 [package]
 name="schema-engine"
-version="0.1.0"
+version="0.2.0"
 edition="2024"
 rust-version="1.89"
 license="MIT OR Apache-2.0"
 repository="https://github.com/LiGoldragon/schema-engine"
-description="Core-first Schema daemon and thin CLI"
+description="Encoded-form Schema daemon and thin CLI"
 [dependencies]
-core-schema={git="https://github.com/LiGoldragon/core-schema.git",rev="d3cdee9ac2c17de16a7745c9854344d8bbcde64e"}
-content-identity={git="https://github.com/LiGoldragon/content-identity.git",rev="6cc0408cdb96f174cc8fdf6ca23420038de28450"}
-name-table={git="https://github.com/LiGoldragon/name-table.git",rev="c3237f77c087e6feab49d6cf34971cebc14a11e6"}
+core-schema={git="https://github.com/LiGoldragon/core-schema.git",rev="cee7f0873c8ccfba0afe09cbb40de531c9e73077"}
+content-identity={git="https://github.com/LiGoldragon/protos.git",rev="e9983d6220856a011886145ed0ef0cc41c9bf597"}
+name-table={git="https://github.com/LiGoldragon/protos.git",rev="e9983d6220856a011886145ed0ef0cc41c9bf597"}
 schema-language={git="https://github.com/LiGoldragon/schema-language.git",rev="9c217610c4b8"}
 kameo={git="https://github.com/LiGoldragon/kameo.git",rev="f491b45d7dcb55e5837eddde3d5d7ca8ceaa9f01",default-features=false,features=["macros"]}
 rkyv={version="0.8",features=["bytecheck"]}
-signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="bc68dc8fa1b16b00156ca36e2690fd77fda91a52"}
-signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git",rev="31ab48608a3c2eab0733dcb16a3351251a70789d"}
+signal-schema={git="https://github.com/LiGoldragon/signal-schema.git",rev="5e985cccbb30d87b3d58bbe6c97759c870d0232f"}
+signal-sema-storage={git="https://github.com/LiGoldragon/signal-sema-storage.git",rev="4fa7256fe5bfe6d4d85b3acceb028d3ae529f6ef"}
 tokio={version="1",features=["macros","rt-multi-thread","net","io-util","fs","sync"]}
 thiserror="2"
 [dev-dependencies]
